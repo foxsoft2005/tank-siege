@@ -250,7 +250,7 @@ Runs with **cheats don't unlock achievements or count toward the totals**, excep
 
 ## Title screen and high score
 
-The title screen has **Play**, **Co-op**, **Garage**, **Achievements**, **Custom levels**, **Level editor**, **Options** and **Quit**, in two columns. Under the menu are your records: the high score and best stage on your last difficulty, your scrap and your achievements. The difficulty page shows the record for whichever difficulty you point at. Tanks drive past in the background. Your best score and stage are saved to `user://save.cfg`. Custom levels and runs where you used cheats don't count toward the high score.
+The title screen has **Play**, **Co-op**, **Garage**, **Achievements**, **Custom levels**, **Level editor**, **Options** and **Quit**, in two columns. Under the menu are your records: the high score and best stage on your last difficulty, your scrap and your achievements. Tanks drive past in the background. Your best score and stage are saved to `user://save.cfg`. Custom levels and runs where you used cheats don't count toward the high score.
 
 The game has three scenes: `title.tscn`, `main.tscn` (the game) and `editor.tscn`. You move between them with `get_tree().change_scene_to_file(...)`. `GameState` (an autoload) carries information across, such as which level to play and where to return afterwards.
 

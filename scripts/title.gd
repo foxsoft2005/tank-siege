@@ -19,7 +19,6 @@ var _coop_chosen := false
 var _coop_hint: Label
 var _best_label: Label
 var _diff_desc: Label
-var _diff_record: Label
 var _update_box: VBoxContainer
 var _demo_tanks: Array[Dictionary] = []
 var _time := 0.0
@@ -182,8 +181,6 @@ func _build_difficulty_page() -> VBoxContainer:
 	_diff_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_diff_desc.custom_minimum_size = Vector2(220, 30)
 	_diff_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_diff_record = MenuKit.label(page, "", 11, UITheme.ACCENT)  # your record on this difficulty
-	_diff_record.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	MenuKit.button(page, "Back", func() -> void: _show_page(_main_page))
 	return page
 
@@ -191,7 +188,6 @@ func _build_difficulty_page() -> VBoxContainer:
 func _on_difficulty_focus(level: int) -> void:
 	_diff_desc.text = Difficulty.DESCRIPTIONS[level]
 	_diff_desc.add_theme_color_override("font_color", Difficulty.COLORS[level])
-	_diff_record.text = _record_text(level)
 
 
 ## Under the main menu: your record on the last difficulty you played, then
