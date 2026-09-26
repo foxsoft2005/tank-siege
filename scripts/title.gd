@@ -19,6 +19,7 @@ var _coop_chosen := false
 var _coop_hint: Label
 var _best_label: Label
 var _diff_desc: Label
+var _diff_record: Label
 var _update_box: VBoxContainer
 var _demo_tanks: Array[Dictionary] = []
 var _time := 0.0
@@ -93,14 +94,16 @@ func _build_ui() -> void:
 	_panel = MenuKit.panel(_pages)
 	_ui.add_child(_panel)
 
+	# Your records, shown under the main menu (placed in _show_page).
 	var best := Label.new()
 	_best_label = best
 	_refresh_best()
-	best.position = Vector2(0, 106)
-	best.size = Vector2(512, 20)
+	best.size = Vector2(512, 30)
 	best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	best.add_theme_font_size_override("font_size", 11)
 	best.add_theme_color_override("font_color", Color("#c9ccd4"))
+	best.add_theme_color_override("font_outline_color", Color.BLACK)
+	best.add_theme_constant_override("outline_size", 4)
 	_ui.add_child(best)
 
 	var version := Label.new()
@@ -112,38 +115,48 @@ func _build_ui() -> void:
 	version.add_theme_constant_override("outline_size", 4)
 	_ui.add_child(version)
 
-	# Update messages appear bottom-right.
+	# Update messages appear at the bottom, under the records.
 	_update_box = VBoxContainer.new()
 	_update_box.theme = UITheme.make()
-	_update_box.alignment = BoxContainer.ALIGNMENT_END
-	_update_box.position = Vector2(362, 128)
-	_update_box.size = Vector2(144, 120)
-	_update_box.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_update_box.add_theme_constant_override("separation", 4)
+	_update_box.position = Vector2(106, 346)
+	_update_box.size = Vector2(300, 50)
 	_ui.add_child(_update_box)
 
 	_show_page(_main_page)
 
 
+## The main menu: 8 buttons in 2 columns, so it fits under the logo with
+## room for your records below it. (Arrow keys move in both directions.)
 func _build_main_page() -> VBoxContainer:
-	var page := MenuKit.page("", 200.0)
-	MenuKit.button(page, "Play", func() -> void:
-		_coop_chosen = false
-		_show_page(_difficulty_page))
-	MenuKit.button(page, "Co-op  (2 players)", func() -> void:
-		_coop_chosen = true
-		_show_page(_difficulty_page))
-	MenuKit.button(page, "Garage  (%d scrap)" % GameState.scrap, func() -> void:
-		get_tree().change_scene_to_file(GameState.GARAGE_SCENE))
-	MenuKit.button(page, "Achievements  (%d/%d)" % [Achievements.unlocked_count(), Achievements.LIST.size()], func() -> void:
-		_fill_achievements_page()
-		_show_page(_achievements_page))
-	MenuKit.button(page, "Custom levels", func() -> void:
-		_fill_levels_page()
-		_show_page(_levels_page))
-	MenuKit.button(page, "Level editor", func() -> void:
-		get_tree().change_scene_to_file(GameState.EDITOR_SCENE))
-	MenuKit.button(page, "Options", func() -> void: _show_page(_options_page))
-	MenuKit.button(page, "Quit", func() -> void: get_tree().quit())
+	var page := MenuKit.page("", 300.0)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	page.add_child(grid)
+	var buttons := [
+		["Play", func() -> void:
+			_coop_chosen = false
+			_show_page(_difficulty_page)],
+		["Co-op  (2 players)", func() -> void:
+			_coop_chosen = true
+			_show_page(_difficulty_page)],
+		["Garage", func() -> void: get_tree().change_scene_to_file(GameState.GARAGE_SCENE)],
+		["Achievements", func() -> void:
+			_fill_achievements_page()
+			_show_page(_achievements_page)],
+		["Custom levels", func() -> void:
+			_fill_levels_page()
+			_show_page(_levels_page)],
+		["Level editor", func() -> void: get_tree().change_scene_to_file(GameState.EDITOR_SCENE)],
+		["Options", func() -> void: _show_page(_options_page)],
+		["Quit", func() -> void: get_tree().quit()],
+	]
+	for entry: Array in buttons:
+		var b := MenuKit.button(grid, entry[0], entry[1])
+		b.custom_minimum_size = Vector2(146, 0)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return page
 
 
@@ -167,6 +180,8 @@ func _build_difficulty_page() -> VBoxContainer:
 	_diff_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_diff_desc.custom_minimum_size = Vector2(220, 30)
 	_diff_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_diff_record = MenuKit.label(page, "", 11, UITheme.ACCENT)  # your record on this difficulty
+	_diff_record.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	MenuKit.button(page, "Back", func() -> void: _show_page(_main_page))
 	return page
 
@@ -174,14 +189,22 @@ func _build_difficulty_page() -> VBoxContainer:
 func _on_difficulty_focus(level: int) -> void:
 	_diff_desc.text = Difficulty.DESCRIPTIONS[level]
 	_diff_desc.add_theme_color_override("font_color", Difficulty.COLORS[level])
-	_refresh_best(level)
+	_diff_record.text = _record_text(level)
 
 
-func _refresh_best(level: int = GameState.difficulty) -> void:
+## Under the main menu: your record on the last difficulty you played, then
+## scrap and achievements.
+func _refresh_best() -> void:
+	_best_label.text = "%s\n%d scrap   ·   %d of %d achievements" % [_record_text(GameState.difficulty),
+		GameState.scrap, Achievements.unlocked_count(), Achievements.LIST.size()]
+
+
+func _record_text(level: int) -> String:
 	var rec := GameState.record_for(level)
 	var tag: String = Difficulty.NAMES[level]
-	_best_label.text = "%s HIGH SCORE  %d   ·   BEST STAGE  %d" % [tag, rec["score"], rec["stage"]] \
-		if rec["score"] > 0 else "no %s high score yet" % tag.to_lower()
+	if rec["score"] <= 0:
+		return "no %s high score yet" % tag.to_lower()
+	return "%s HIGH SCORE  %d   ·   BEST STAGE  %d" % [tag, rec["score"], rec["stage"]]
 
 
 func _fill_levels_page() -> void:
@@ -286,12 +309,19 @@ func _achievement_row(a: Dictionary) -> Control:
 func _show_page(page: VBoxContainer) -> void:
 	for p in _pages.get_children():
 		p.visible = p == page
-	_best_label.visible = page != _options_page and page != _achievements_page  # tall panels would cover it
+	# Records and update messages belong to the main menu only; other pages
+	# are taller and would cover them.
+	_best_label.visible = page == _main_page
+	_update_box.visible = page == _main_page
 	if _coop_hint:
 		_coop_hint.visible = _coop_chosen
 	await MenuKit.center(_panel, 38.0)
-	_panel.position.y = maxf(_panel.position.y, 124.0)  # stay below the high score line...
+	_panel.position.y = maxf(_panel.position.y, 116.0)  # stay below the logo...
 	_panel.position.y = minf(_panel.position.y, 412.0 - _panel.size.y)  # ...but on screen
+	if page == _main_page:
+		_panel.position.y = 118.0  # right under the logo, records below it
+		_best_label.position = Vector2(0, _panel.position.y + _panel.size.y + 8.0)
+		_update_box.position.y = _best_label.position.y + 36.0
 	MenuKit.focus_first(page)
 	if page == _difficulty_page:  # start on the difficulty you played last
 		(page.get_node(Difficulty.NAMES[GameState.difficulty]) as Control).grab_focus()
@@ -318,10 +348,11 @@ func _refresh_update_banner() -> void:
 			_banner_text("You have the latest version.")
 		Updater.State.AVAILABLE:
 			_banner_text("Update v%s available!" % info.get("version", "?"), UITheme.ACCENT)
+			var row := _button_row()
 			if Updater.can_auto_install():
-				MenuKit.button(_update_box, "Download & install", Updater.download_and_install)
+				MenuKit.button(row, "Download & install", Updater.download_and_install)
 			if info.get("page_url", "") != "":
-				MenuKit.button(_update_box, "Open download page", func() -> void:
+				MenuKit.button(row, "Open download page", func() -> void:
 					OS.shell_open(info["page_url"]))
 		Updater.State.DOWNLOADING:
 			_banner_text("Downloading… %d%%" % int(Updater.progress * 100.0))
@@ -332,14 +363,22 @@ func _refresh_update_banner() -> void:
 			_update_box.add_child(bar)
 		Updater.State.READY:
 			_banner_text("Update installed. Restart to play v%s." % info.get("version", "?"), Color("#6fe07a"))
-			MenuKit.button(_update_box, "Restart now", Updater.restart_game)
+			MenuKit.button(_button_row(), "Restart now", Updater.restart_game)
 		Updater.State.FAILED:
 			_banner_text("Update check failed:\n" + Updater.error_text, Color("#ff8a7a"))
 
 
+func _button_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 8)
+	_update_box.add_child(row)
+	return row
+
+
 func _banner_text(text: String, color := Color("#9aa0b0")) -> void:
 	var l := MenuKit.label(_update_box, text, 11, color)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 
@@ -364,7 +403,7 @@ static func load_custom_level(level_name: String) -> PackedStringArray:
 func _spawn_demo_tanks() -> void:
 	var kinds := ["player_L2", "basic", "fast", "power", "armor", "basic"]
 	for i in kinds.size():
-		var lane := 136.0 if i % 2 == 0 else 330.0
+		var lane := 136.0 if i % 2 == 0 else 382.0  # (the lower lane stays clear of the records text)
 		var dir := 1.0 if i % 2 == 0 else -1.0
 		_demo_tanks.append({
 			"sprite": kinds[i],

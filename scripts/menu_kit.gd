@@ -134,6 +134,9 @@ static func choice(parent: Control, text: String, items: Array[String], selected
 ## Give keyboard/gamepad focus to the first thing on a page you can interact with.
 static func focus_first(p: Control) -> void:
 	for child in p.get_children():
+		if child is GridContainer and child.get_child_count() > 0:  # a grid of buttons
+			(child.get_child(0) as Control).grab_focus()
+			return
 		if child is HBoxContainer and child.get_child_count() > 1:  # a slider row
 			(child.get_child(1) as Control).grab_focus()
 			return
