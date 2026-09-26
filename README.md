@@ -306,6 +306,40 @@ All the art is in `assets/sprites/`: 6 tank colors with 2 tread frames each, bri
 - **Copy as code** puts the level on your clipboard as GDScript. Paste it into `MAPS` in `level_data.gd` and it becomes a real campaign stage.
 - Level files are plain text, 13 lines of 13 characters, using the map characters from the Tiles table (`.` is empty). You can share them or edit them in Notepad.
 
+## Building the game (Windows / macOS)
+
+**Automatically on GitHub (easiest).** The repo includes a build script, `.github/workflows/build.yml`. To publish a version:
+1. Bump the version in `scripts/version.gd` **and** `project.godot` (`config/version`). They must match.
+2. Commit, then tag and push:
+   ```
+   git tag v1.5.1
+   git push origin main v1.5.1
+   ```
+3. Wait about 5 minutes. A new release appears on the repo's **Releases** page with:
+   - `TankSiege-v1.5.1-windows.zip`, a single `.exe`
+   - `TankSiege-v1.5.1-macos.zip`, a universal `.app` for Apple Silicon and Intel
+   - `tank-siege.pck` and `update.json`, for the auto-updater
+
+To just try a build without a release, open the **Actions** tab → **Build game** → **Run workflow**. The zips appear under **Artifacts** on that run's page. If the tag doesn't match the game version, the build stops with a clear error, so a release can never ship with the wrong number.
+
+It all runs on a Linux machine, because Godot can export Windows and Mac games from Linux. For a private repo, GitHub gives 2,000 free build minutes a month, and one build takes about 5.
+
+**By hand, in the Godot editor:**
+1. Go to **Editor → Manage Export Templates → Download and Install** (once).
+2. Go to **Project → Export**. The *Windows Desktop* and *macOS* presets are already set up in `export_presets.cfg`.
+3. Pick one and click **Export Project…**. Keep **Export With Debug** off for a release: it's faster and turns off the F2/F3 test keys.
+
+**Unsigned-app warnings.** The builds aren't signed with a paid certificate, so the first launch shows a warning:
+- **Windows** ("Windows protected your PC"): click **More info → Run anyway**.
+- **macOS**: right-click the app → **Open** → **Open**. If it says the app "is damaged", run `xattr -cr "/Applications/Tank Siege.app"`.
+
+To get rid of the macOS warning, you need an Apple Developer account ($99/year). Put your certificate and notarization details in the macOS preset's *Codesign* and *Notarization* options.
+
+**Settings that matter:**
+- Windows: *Embed PCK* is on, so you get one `.exe` file.
+- macOS: universal architecture and bundle id `com.foxsoft2005.tanksiege`.
+- `project.godot` turns on *Import ETC2 ASTC*, which Godot requires for Apple Silicon builds.
+
 ## Updates and auto-update
 
 The game can check the internet for a newer version and install it. It's **off until you set it up**, because it needs somewhere to host your files. Two good options:
@@ -324,7 +358,7 @@ Safety details: only `https://` URLs are allowed. The patch is re-checked on eve
 
 **Publishing an update, step by step:**
 1. Make your changes and bump `VERSION` in `scripts/version.gd`, for example `1.0.0` → `1.1.0`. Also update *Project Settings → Application → Config → Version*.
-2. Install the export templates (**Editor → Manage Export Templates**) and add a Windows/Linux/macOS preset in **Project → Export**.
+2. Install the export templates (**Editor → Manage Export Templates**). The Windows and macOS presets are already in **Project → Export**. The GitHub build script also makes the `.pck` and `update.json` for you: see "Building the game".
 3. In the Export window, click **Export PCK/ZIP…** and save `tank-siege.pck`.
 4. Upload the `.pck`, for example as a GitHub release asset, and copy its download URL.
 5. Run `python tools/make_update_manifest.py tank-siege.pck 1.1.0 <pck URL> <your game page URL> "What's new"`. It writes `update.json`.
@@ -427,6 +461,8 @@ The letters are read by **key position** (QWERTY), so the codes also work with a
 
 ```
 project.godot       engine settings (window size, autoloads)
+export_presets.cfg  Windows + macOS export settings
+.github/workflows/build.yml   builds Windows + macOS on GitHub and publishes a Release
 assets/sfx/         sound effects (.wav)
 assets/music/       chiptune music loops (.ogg)
 assets/sprites/     pixel art (.png)

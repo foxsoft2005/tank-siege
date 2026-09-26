@@ -1,0 +1,132 @@
+# Builds Tank Siege for Windows and macOS on GitHub's servers.
+#
+#   * Push a version tag (git tag v1.5.0 && git push origin v1.5.0)
+#       -> builds both, and publishes a GitHub Release with the downloads.
+#   * Or run it by hand: Actions tab -> "Build game" -> Run workflow
+#       -> builds both; download them from the run's "Artifacts" section.
+#
+# The tag must match VERSION in scripts/version.gd (and config/version in
+# project.godot), so a release can never ship with the wrong version number.
+#
+# Everything runs on a cheap Linux machine: Godot can export Windows and macOS
+# games from Linux. Export settings live in export_presets.cfg.
+
+name: Build game
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed to create the Release
+
+env:
+  GODOT_VERSION: "4.5"
+  GODOT_STATUS: "stable"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check version numbers
+        id: ver
+        run: |
+          VERSION=$(grep -oP 'VERSION := "\K[^"]+' scripts/version.gd)
+          PROJECT_VERSION=$(grep -oP 'config/version="\K[^"]+' project.godot)
+          echo "Game version: $VERSION"
+          if [ "$PROJECT_VERSION" != "$VERSION" ]; then
+            echo "::error::project.godot says $PROJECT_VERSION but scripts/version.gd says $VERSION"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match the game version v$VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Godot + export templates are ~1.4 GB to download, so keep them between runs.
+      - name: Cache Godot
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_STATUS }}-win-mac
+
+      - name: Download Godot and export templates
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_STATUS}"
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip "$BASE/Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          mv /tmp/godot/Godot_v*_linux.x86_64 ~/godot/godot
+          curl -fsSL -o /tmp/templates.tpz "$BASE/Godot_v${GODOT_VERSION}-${GODOT_STATUS}_export_templates.tpz"
+          TEMPLATES=~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}
+          mkdir -p "$TEMPLATES"
+          # Only the templates we need (the full set is huge).
+          unzip -q -j /tmp/templates.tpz "templates/version.txt" "templates/windows_release_x86_64*" \
+            "templates/macos.zip" -d "$TEMPLATES"
+          ls -la "$TEMPLATES"
+
+      - name: Import the project
+        run: ~/godot/godot --headless --path . --import
+
+      - name: Export Windows and macOS
+        run: |
+          mkdir -p build/windows build/macos
+          ~/godot/godot --headless --path . --export-release "Windows Desktop" build/windows/TankSiege.exe
+          ~/godot/godot --headless --path . --export-release "macOS" build/macos/TankSiege.zip
+          # The game data on its own: the auto-updater's patch file.
+          ~/godot/godot --headless --path . --export-pack "Windows Desktop" build/tank-siege.pck
+          test -s build/windows/TankSiege.exe
+          test -s build/macos/TankSiege.zip
+          test -s build/tank-siege.pck
+
+      - name: Package
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          REPO_URL="https://github.com/${{ github.repository }}"
+          (cd build/windows && zip -q "../TankSiege-v$V-windows.zip" TankSiege.exe)
+          mv build/macos/TankSiege.zip "build/TankSiege-v$V-macos.zip"
+          # update.json for the auto-updater (see "Updates and auto-update" in the README)
+          python3 tools/make_update_manifest.py build/tank-siege.pck "$V" \
+            "$REPO_URL/releases/download/v$V/tank-siege.pck" "$REPO_URL/releases/tag/v$V" "Tank Siege v$V"
+          mv update.json build/
+          ls -la build
+
+      - name: Keep the builds (downloadable from this run's page)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TankSiege-v${{ steps.ver.outputs.version }}
+          path: |
+            build/TankSiege-v*-windows.zip
+            build/TankSiege-v*-macos.zip
+            build/tank-siege.pck
+            build/update.json
+
+      - name: Publish the GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Tank Siege v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          body: |
+            **Windows:** download `TankSiege-v${{ steps.ver.outputs.version }}-windows.zip`, unzip, run `TankSiege.exe`.
+            If Windows shows "Windows protected your PC", click **More info → Run anyway**.
+
+            **macOS:** download `TankSiege-v${{ steps.ver.outputs.version }}-macos.zip`, unzip, move **Tank Siege** to Applications.
+            The first time, right-click the app → **Open** → **Open**. If macOS says the app is damaged, run:
+            `xattr -cr "/Applications/Tank Siege.app"`
+
+            `tank-siege.pck` + `update.json` are for the in-game auto-updater.
+          files: |
+            build/TankSiege-v*-windows.zip
+            build/TankSiege-v*-macos.zip
+            build/tank-siege.pck
+            build/update.json
