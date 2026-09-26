@@ -9,10 +9,12 @@ extends CanvasLayer
 ##           achievements unlocked along the way.
 ##
 ## Everything animates in. Press Fire / Enter to skip the animation, then again
-## to continue. At game over there are Retry / Main menu buttons instead.
+## to continue. At game over there are Retry / Main menu buttons instead
+## (Esc = Main menu), and two tabs: THIS STAGE (the stage you fell on) and
+## WHOLE RUN (every stage added up).
 ##
-## Main builds the `data` dictionary (see Main._stats_data) and waits for
-## `closed`, which says what to do next: "continue", "retry" or "menu".
+## Main builds the `data` dictionary and waits for `closed`, which says what
+## to do next: "continue", "retry" or "menu".
 
 signal closed(choice: String)
 
@@ -28,6 +30,12 @@ const GOLD := Color("#f2c230")
 const DIM := Color("#8a8f9e")
 
 var _data: Dictionary
+var _views: Dictionary     # "stage" (and at game over "run") -> numbers to show
+var _view := "stage"       # which one is on screen
+var _v: Dictionary         # = _views[_view]
+var _pending_view := ""    # a tab was clicked while the animation was running
+var _content: Control      # everything that changes between the two tabs
+var _tabs: Array[Button] = []
 var _game_over: bool
 var _coop: bool
 var _skip := false         # the player pressed a button: finish instantly
@@ -37,11 +45,14 @@ var _hint: Label
 var _buttons: HBoxContainer
 
 
-## data keys: title, subtitle, stats (a stats Dictionary), time (seconds),
-## score_line, medals [{name, desc, bonus, tier}], achievements [ids],
-## extra [String], game_over (bool)
+## data keys: title, subtitle, extra [String], game_over (bool), and either
+## the numbers of one view directly, or "views": {"stage": {...}, "run": {...}}.
+## A view has: stats (a stats Dictionary), time (seconds), score_line,
+## medals [{name, desc, bonus, tier}], achievements [ids], stages_cleared.
 func _init(data: Dictionary) -> void:
 	_data = data
+	_views = data.get("views", {"stage": data})
+	_v = _views[_view]
 	_game_over = data.get("game_over", false)
 	_coop = GameState.coop
 	layer = 20  # above the HUD and messages
@@ -68,14 +79,69 @@ func _ready() -> void:
 	line.size = Vector2(1, 222)
 	add_child(line)
 
+	if _views.size() > 1:
+		_build_tabs()
 	_play()
+
+
+## THIS STAGE / WHOLE RUN (game over only)
+func _build_tabs() -> void:
+	var row := HBoxContainer.new()
+	row.theme = UITheme.make()
+	row.add_theme_constant_override("separation", 6)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.position = Vector2(146, 346)
+	row.size = Vector2(220, 24)
+	add_child(row)
+	var group := ButtonGroup.new()
+	for entry in [["stage", "This stage"], ["run", "Whole run"]]:
+		var b := Button.new()
+		b.text = entry[1]
+		b.toggle_mode = true
+		b.button_group = group
+		b.button_pressed = entry[0] == _view
+		b.focus_mode = Control.FOCUS_ALL
+		b.custom_minimum_size = Vector2(104, 0)
+		b.add_theme_font_size_override("font_size", 12)
+		b.add_theme_color_override("font_pressed_color", GOLD)
+		b.pressed.connect(_show_view.bind(entry[0]))
+		row.add_child(b)
+		_tabs.append(b)
+
+
+func _show_view(view_name: String) -> void:
+	if view_name == _view:
+		return
+	if not _done:  # still animating: finish instantly, then switch
+		_pending_view = view_name
+		_skip = true
+		return
+	_view = view_name
+	_v = _views[_view]
+	Sfx.play("ui_move", -4.0, 0.0)
+	_skip = true  # no animation when switching tabs
+	_content.queue_free()
+	_build()
 
 
 # ---------------------------------------------------------------- animation
 
 func _play() -> void:
-	var stats: Dictionary = _data["stats"]
 	await _wait(0.35)
+	await _build()
+	_finish()
+	if _pending_view != "":
+		var v := _pending_view
+		_pending_view = ""
+		_show_view(v)
+
+
+## Everything that depends on the view. Animated, or instant when _skip is set.
+func _build() -> void:
+	_content = Control.new()
+	_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_content)
+	var stats: Dictionary = _v["stats"]
 
 	# --- left: the tally
 	_label("DESTROYED", 13, Color("#9fd8ff"), Vector2(20, 68))
@@ -136,16 +202,16 @@ func _play() -> void:
 		v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		if not _skip:
 			Sfx.play("tally", -8.0, 0.0, 0.8)
-		y += 17.0 if _game_over else 19.0  # game over has an extra line + records
+		y += 17.0 if _game_over else 19.0  # game over has records under the numbers
 		await _wait(0.09)
-	for extra: String in _data.get("extra", []):
+	for extra: String in _data.get("extra", []):  # (records for the run: shown on both tabs)
 		var e := _label(extra, 12, GOLD, Vector2(278, y + 2.0), 218)
 		e.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		y += 17.0
 
 	# --- bottom: awards and achievements
-	var medals: Array = _data.get("medals", [])
-	var achs: Array = _data.get("achievements", [])
+	var medals: Array = _v.get("medals", [])
+	var achs: Array = _v.get("achievements", [])
 	if not medals.is_empty():
 		await _wait(0.25)
 		await _chip_row("AWARDS", medals, 312.0, 8)  # up to 2 lines
@@ -157,15 +223,13 @@ func _play() -> void:
 			items.append({"name": a["name"], "tier": a["tier"], "bonus": 0})
 		await _chip_row("ACHIEVEMENTS", items, 362.0 if not medals.is_empty() else 312.0, 3)
 
-	_finish()
-
 
 func _summary_lines(stats: Dictionary) -> Array:
 	var lines := []
-	var t := int(_data.get("time", 0.0))
+	var t := int(_v.get("time", 0.0))
 	lines.append(["TIME", "%d:%02d" % [t / 60, t % 60]])
-	if _game_over:
-		lines.append(["STAGES CLEARED", str(_data.get("stages_cleared", 0))])
+	if _v.has("stages_cleared"):
+		lines.append(["STAGES CLEARED", str(_v["stages_cleared"])])
 	lines.append(["SHELLS FIRED", str(GameState.stat(stats, "shots"))])
 	lines.append(["ACCURACY", _accuracy_text(stats)])
 	lines.append(["BEST COMBO", "x%d" % GameState.stat(stats, "best_combo")])
@@ -173,7 +237,7 @@ func _summary_lines(stats: Dictionary) -> Array:
 	lines.append(["POWER-UPS", str(GameState.stat(stats, "powerups"))])
 	lines.append(["SHELLS SHOT DOWN", str(GameState.stat(stats, "cancels"))])
 	lines.append(["ARMOR LOST", str(GameState.stat(stats, "armor_lost"))])
-	lines.append(["SCORE", _data.get("score_line", ""), GOLD])
+	lines.append(["SCORE", _v.get("score_line", ""), GOLD])
 	return lines
 
 
@@ -200,7 +264,7 @@ func _chip_row(caption: String, items: Array, y: float, max_chips: int) -> void:
 	row.add_theme_constant_override("v_separation", 0)
 	row.position = Vector2(100, y - 8.0)
 	row.size = Vector2(400, 20)
-	add_child(row)
+	_parent().add_child(row)
 	for n in items.size():
 		var item: Dictionary = items[n]
 		if n == max_chips:
@@ -259,6 +323,13 @@ func _finish() -> void:
 # ---------------------------------------------------------------- input
 
 func _input(event: InputEvent) -> void:
+	if _game_over and (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")):
+		get_viewport().set_input_as_handled()
+		if not _done:
+			_skip = true
+		else:
+			_close("menu")  # Esc / Start: back to the menu
+		return
 	if not _pressed_continue(event):
 		return
 	if Time.get_ticks_msec() - _opened_at < 400:
@@ -288,6 +359,12 @@ func _close(choice: String) -> void:
 
 # ---------------------------------------------------------------- helpers
 
+## Where new labels go: into the current tab's content once it exists
+## (so switching tabs can clear it), otherwise onto the screen itself.
+func _parent() -> Node:
+	return _content if is_instance_valid(_content) else self
+
+
 ## Wait in real time (works while paused and during hit-stop), unless skipping.
 func _wait(seconds: float) -> void:
 	if _skip:
@@ -305,7 +382,7 @@ func _label(text: String, size: int, color: Color, pos: Vector2, width := 0.0) -
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_constant_override("outline_size", 4)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	add_child(l)
+	_parent().add_child(l)
 	return l
 
 
@@ -321,4 +398,4 @@ func _icon(sprite: String, frame_px: int, center: Vector2, px: float) -> void:
 	tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	tr.size = Vector2(px, px)
 	tr.position = center - Vector2(px, px) / 2.0
-	add_child(tr)
+	_parent().add_child(tr)

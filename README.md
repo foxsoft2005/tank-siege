@@ -207,14 +207,14 @@ All 5 Garage tanks have all 4 shapes (`assets/sprites/tank_<color>_L0..L3.png`).
 
 ## Game over
 
-When the game ends, whether you ran out of lives or the core fell, **everything stops where it is**. Tanks freeze, and shells in flight fizzle out. Explosions and score popups still finish playing. See `_freeze_battlefield()` in `main.gd`: switching off `_physics_process` on every tank freezes its movement, AI and shooting in one go. After a moment, the run's stats screen appears with **Retry** and **Main menu** buttons. Enter still works as a quick retry before it appears.
+When the game ends, whether you ran out of lives or the core fell, **everything stops where it is**. Tanks freeze, and shells in flight fizzle out. Explosions and score popups still finish playing. See `_freeze_battlefield()` in `main.gd`: switching off `_physics_process` on every tank freezes its movement, AI and shooting in one go. After a moment, the stats screen appears with **Retry** and **Main menu** buttons (Esc also goes to the menu). It has two tabs: **This stage** (the stage you fell on, shown first) and **Whole run** (every stage added up).
 
 ## Stats screen
 
 After every stage there's a **stats screen**, and at game over there's one for the whole run:
 
 - **DESTROYED**: a tally like the original game. There's one row per enemy type, and the counter blips up one tank at a time. In co-op there's a column for each player.
-- **The numbers**: time, shells fired, accuracy, best combo, wall pieces smashed, power-ups, enemy shells shot down, armor lost and score. At game over you also see stages cleared, a new high score and the scrap you earned.
+- **The numbers**: time, shells fired, accuracy, best combo, wall pieces smashed, power-ups, enemy shells shot down, armor lost and score. After a stage these are for that stage only. At game over there are two tabs: **This stage** and **Whole run** (which adds stages cleared), plus a new high score and the scrap you earned.
 - **AWARDS** (stage only): small score bonuses for playing well.
 
 | Award | For | Bonus |

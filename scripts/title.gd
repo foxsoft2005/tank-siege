@@ -43,11 +43,13 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	for t in _demo_tanks:
-		t.pos.x += t.speed * delta
-		if t.pos.x > 560.0:
-			t.pos.x = -48.0
-		elif t.pos.x < -48.0:
-			t.pos.x = 560.0
+		t.pos += t.vel * delta
+		if t.patrol:
+			# Side patrols turn around at the ends of their beat.
+			if (t.vel.y > 0.0 and t.pos.y > PATROL_BOTTOM) or (t.vel.y < 0.0 and t.pos.y < PATROL_TOP):
+				t.vel.y = -t.vel.y
+		elif t.pos.x > 512.0 + CONVOY_WRAP:
+			t.pos.x -= 512.0 + 2.0 * CONVOY_WRAP  # off the right edge -> back in on the left
 	queue_redraw()
 
 
@@ -400,27 +402,40 @@ static func load_custom_level(level_name: String) -> PackedStringArray:
 
 # ---------------------------------------------------------------- attract mode
 
+## The background "attract mode":
+##   * a convoy of 3 tanks along the bottom, all at the same speed and evenly
+##     spaced, so they never drive into each other, and clear of the brick wall;
+##   * one tank patrolling up and down each side of the menu.
+const CONVOY_Y := 372.0      # tanks are 32px tall: 356..388, above the bricks at 400
+const CONVOY_SPEED := 36.0
+const CONVOY_WRAP := 40.0    # how far off-screen a tank goes before coming back
+const PATROL_TOP := 58.0     # below the top bricks (0..32)
+const PATROL_BOTTOM := 326.0 # above the convoy lane
+
+
 func _spawn_demo_tanks() -> void:
-	var kinds := ["player_L2", "basic", "fast", "power", "armor", "basic"]
-	for i in kinds.size():
-		var lane := 136.0 if i % 2 == 0 else 382.0  # (the lower lane stays clear of the records text)
-		var dir := 1.0 if i % 2 == 0 else -1.0
+	var convoy := ["player_L2", "basic", "fast"]
+	var loop := 512.0 + 2.0 * CONVOY_WRAP
+	for i in convoy.size():
 		_demo_tanks.append({
-			"sprite": kinds[i],
-			"pos": Vector2(randf_range(0, 512), lane + (i % 3) * 6.0 - 6.0),
-			"speed": dir * randf_range(30.0, 55.0),
+			"sprite": convoy[i],
+			"pos": Vector2(-CONVOY_WRAP + loop * i / convoy.size(), CONVOY_Y),
+			"vel": Vector2(CONVOY_SPEED, 0.0),
+			"patrol": false,
 		})
+	_demo_tanks.append({"sprite": "armor", "pos": Vector2(40.0, 120.0), "vel": Vector2(0.0, 28.0), "patrol": true})
+	_demo_tanks.append({"sprite": "power", "pos": Vector2(472.0, 260.0), "vel": Vector2(0.0, -28.0), "patrol": true})
 
 
 func _draw() -> void:
 	draw_rect(Rect2(0, 0, 512, 416), Color("#0c0c10"))
-	# Brick strips at top and bottom
+	# Tanks (sprites face up, so rotate them to face the way they drive)
+	for t in _demo_tanks:
+		var frame := int(_time * 8.0) % 2
+		draw_set_transform(t.pos, (t.vel as Vector2).angle() + PI / 2.0)
+		Art.draw_frame(self, "tank_" + t.sprite, frame, Vector2(16, 16), Vector2.ZERO, Color(0.55, 0.55, 0.6))
+	draw_set_transform(Vector2.ZERO)
+	# Brick strips at top and bottom, drawn last so nothing ever covers them
 	for x in range(0, 512, 16):
 		for y in [0, 16, 400]:
 			Art.draw_frame(self, "brick", 0, Vector2(8, 8), Vector2(x + 8, y + 8), Color(0.55, 0.55, 0.6))
-	# Tanks driving across
-	for t in _demo_tanks:
-		var frame := int(_time * 8.0) % 2
-		draw_set_transform(t.pos, PI / 2.0 if t.speed > 0 else -PI / 2.0)
-		Art.draw_frame(self, "tank_" + t.sprite, frame, Vector2(16, 16), Vector2.ZERO, Color(0.55, 0.55, 0.6))
-	draw_set_transform(Vector2.ZERO)

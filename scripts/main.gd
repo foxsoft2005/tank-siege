@@ -196,11 +196,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		Sfx.toggle_mute()
 		if state == State.PLAYING and not get_tree().paused:
 			_show_message("SOUND OFF" if Sfx.muted else "SOUND ON", 0.8)
-	elif event.is_action_pressed("restart") and state == State.GAME_OVER:
-		GameState.reset()
-		get_tree().reload_current_scene()
-	elif event.is_action_pressed("pause") and state == State.GAME_OVER:
-		get_tree().change_scene_to_file(GameState.return_scene)
+	# (At game over, Retry / Main menu are buttons on the stats screen. There
+	# used to be Enter / Esc shortcuts here too, but Enter on the "Main menu"
+	# button also triggered the Enter = retry shortcut and started a new game.)
 	elif event.is_action_pressed("debug_clear_stage") and OS.is_debug_build() and state == State.PLAYING:
 		_skip_stage()  # testing shortcut: F2
 	elif event.is_action_pressed("debug_paths") and OS.is_debug_build():
@@ -678,21 +676,30 @@ func _game_over() -> void:
 	_message_label.add_theme_font_size_override("font_size", 40)
 	_show_message("GAME OVER")
 	await get_tree().create_timer(2.2).timeout
-	if not is_inside_tree() or state != State.GAME_OVER:
-		return  # the player already pressed Enter to retry
 	_message_label.text = ""
 
-	# The run's stats screen, with Retry / Main menu buttons.
+	# Stats with Retry / Main menu buttons, and two tabs: the stage you fell
+	# on (shown first), and the whole run added up.
 	var stats_screen := StatsScreen.new({
 		"game_over": true,
 		"title": "GAME OVER",
 		"subtitle": "%s  ·  fell on stage %d" % [Difficulty.NAMES[GameState.difficulty], GameState.stage],
-		"stats": GameState.run_stats,
-		"time": GameState.stat(GameState.run_stats, "time_ms") / 1000.0,
-		"stages_cleared": GameState.stat(GameState.run_stats, "stages_cleared"),
-		"score_line": str(GameState.score),
-		"achievements": GameState.run_achievements,
 		"extra": extra,
+		"views": {
+			"stage": {
+				"stats": GameState.stage_stats,
+				"time": stage_time,
+				"score_line": "+%d" % (GameState.score - _stage_start_score),
+				"achievements": _stage_achievements,
+			},
+			"run": {
+				"stats": GameState.run_stats,
+				"time": GameState.stat(GameState.run_stats, "time_ms") / 1000.0,
+				"stages_cleared": GameState.stat(GameState.run_stats, "stages_cleared"),
+				"score_line": str(GameState.score),
+				"achievements": GameState.run_achievements,
+			},
+		},
 	})
 	add_child(stats_screen)
 	if result["scrap"] > 0:
