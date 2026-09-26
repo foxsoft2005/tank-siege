@@ -61,7 +61,7 @@ Protect the glowing core at the bottom. Each stage has 20 enemies, with at most 
 | **Sniper** | navy | 3 | When it lines up with you, it stops, shows a **red laser sight** (your warning), then fires a very fast shell. Break the line or dodge. |
 | **Shielded** | teal | 4 | A steel plate **deflects shells from the front**. Hit it from the side or behind. Explosions ignore the shield. |
 | **Engineer** | khaki | 4 | Drives to bricks you've shot away and **rebuilds** them (2 at a time). Kill it first. |
-Enemies #4, #11 and #18 blink red. Destroy one to drop a power-up:
+Enemies #4, #11 and #18 blink red. Destroy one to drop a power-up. It always lands on an empty block you can drive to: never inside walls or water, under a bush, on a belt or teleporter, or somewhere walled off by steel. (Bricks in the way are fine, because you can shoot through them.) See `Level.powerup_spots()`.
 
 | Icon | Power-up | Effect |
 |------|----------|--------|

@@ -22,6 +22,7 @@ var rubble: Dictionary = {}  # cells where a brick was shot away (engineers rebu
 var floor: Dictionary = {}
 var blocks_with_floor: Array[Vector2i] = []  # belt + teleporter blocks (drawn per block)
 var teleporters: Array[Vector2i] = []        # teleporter blocks, in map order
+var bush_blocks: Array[Vector2i] = []        # where the bushes are (power-ups avoid them)
 
 signal barrel_exploded(pos: Vector2)
 
@@ -47,6 +48,7 @@ func build(rows: PackedStringArray) -> void:
 			var ch := row[bx]
 			if ch == "G":
 				add_child(Bush.new(Vector2(bx * BLOCK + 16, by * BLOCK + 16)))
+				bush_blocks.append(Vector2i(bx, by))
 				continue
 			if _add_floor(Vector2i(bx, by), ch):
 				continue
@@ -327,6 +329,51 @@ func find_path(from: Vector2, to: Vector2i) -> Array[Vector2i]:
 	if not nav.is_in_boundsv(start) or not nav.is_in_boundsv(to):
 		return []
 	return nav.get_id_path(start, to, true)
+
+
+## Every grid point a tank at `from` can drive to (a "flood fill" over the
+## navigation grid). Steel, water, barrels and the core block the way; bricks
+## don't, because you can shoot through them.
+func reachable_points(from: Vector2) -> Dictionary:
+	var start := to_point(from)
+	var seen := {}
+	if not nav.is_in_boundsv(start):
+		return seen
+	var todo: Array[Vector2i] = [start]
+	seen[start] = true
+	while not todo.is_empty():
+		var p: Vector2i = todo.pop_back()
+		for step in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var n: Vector2i = p + step
+			if nav.is_in_boundsv(n) and not seen.has(n) and not nav.is_point_solid(n):
+				seen[n] = true
+				todo.append(n)
+	return seen
+
+
+## Good places to drop a power-up: map blocks that are completely empty (no
+## brick, steel, water or barrel in any of their 4 pieces), not hidden under a
+## bush, not on a belt or teleporter, not next to the core, and that a tank
+## at `from` can actually drive to. Returns block centres.
+func powerup_spots(from: Vector2) -> Array[Vector2]:
+	var reachable := reachable_points(from)
+	var spots: Array[Vector2] = []
+	for by in range(0, BLOCKS - 1):  # (the bottom row is the core and your spawn)
+		for bx in BLOCKS:
+			var b := Vector2i(bx, by)
+			if b in bush_blocks or b in blocks_with_floor:
+				continue
+			if bx >= 5 and bx <= 7 and by >= 11:
+				continue  # the core's wall
+			var empty := true
+			for dy in 2:
+				for dx in 2:
+					if walls.has(Vector2i(bx * 2 + dx, by * 2 + dy)):
+						empty = false
+			var centre := Vector2(bx * BLOCK + 16, by * BLOCK + 16)
+			if empty and reachable.has(to_point(centre)):
+				spots.append(centre)
+	return spots
 
 
 ## Could a shell fly from `from` to `to` in a straight line without hitting

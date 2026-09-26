@@ -778,11 +778,34 @@ func _exit_tree() -> void:
 
 func _drop_powerup() -> void:
 	var pu := PowerUp.new(PowerUp.Kind.values().pick_random())
-	pu.position = Vector2(randi_range(0, 12) * 32 + 16, randi_range(1, 10) * 32 + 16)
+	pu.position = _powerup_spot()
 	pu.collected.connect(_on_powerup_collected, CONNECT_DEFERRED)
 	# We're usually inside a physics callback here (a bullet just hit a tank).
 	# Physics objects can't be added mid-callback, so add it at the end of the frame.
 	world.add_child.call_deferred(pu)
+
+
+## Somewhere a player can actually reach (see Level.powerup_spots), and not on
+## top of another power-up. Two can drop in the same frame (a boss drops two),
+## so we also remember the spots we just used.
+var _recent_drops: Array[Vector2] = []
+
+func _powerup_spot() -> Vector2:
+	var alive := _alive_players()
+	var from: Vector2 = alive[0].position if not alive.is_empty() else Level.PLAYER_SPAWN
+	var spots := level.powerup_spots(from)
+	var taken: Array[Vector2] = _recent_drops.duplicate()
+	for child in world.get_children():
+		if child is PowerUp:
+			taken.append((child as PowerUp).position)
+	var free := spots.filter(func(p: Vector2) -> bool: return p not in taken)
+	if free.is_empty():
+		free = spots
+	var spot: Vector2 = free.pick_random() if not free.is_empty() else Level.PLAYER_SPAWN + Vector2(0, -64)
+	_recent_drops.append(spot)
+	if _recent_drops.size() > 4:
+		_recent_drops.pop_front()
+	return spot
 
 
 ## `by` is the player who drove over it: stars, shields and lives are theirs.
