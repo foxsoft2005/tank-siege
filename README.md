@@ -316,8 +316,10 @@ All the art is in `assets/sprites/`: 6 tank colors with 2 tread frames each, bri
    git push origin main v1.5.1
    ```
 3. Wait a minute or two. A new release appears on the repo's **Releases** page with:
-   - `TankSiege-v1.5.1-windows.zip`, a single `.exe`
-   - `TankSiege-v1.5.1-macos.zip`, a universal `.app` for Apple Silicon and Intel
+   - `TankSiege-windows.zip`, a single `.exe`
+   - `TankSiege-macos.zip`, a universal `.app` for Apple Silicon and Intel
+
+   The file names never change, so `https://github.com/<you>/tank-siege/releases/latest/download/TankSiege-windows.zip` always gets the newest version. The website in `site/` uses these links.
    - `tank-siege.pck` and `update.json`, for the auto-updater
 
 To just try a build without a release, open the **Actions** tab → **Build game** → **Run workflow**. The zips appear under **Artifacts** on that run's page. If the tag doesn't match the game version, the build stops with a clear error, so a release can never ship with the wrong number.
@@ -339,6 +341,15 @@ To get rid of the macOS warning, you need an Apple Developer account ($99/year).
 - Windows: *Embed PCK* is on, so you get one `.exe` file.
 - macOS: universal architecture and bundle id `com.foxsoft2005.tanksiege`.
 - `project.godot` turns on *Import ETC2 ASTC*, which Godot requires for Apple Silicon builds.
+
+## Website
+
+`site/` is a one-page website for the game: `index.html` plus the images in `site/img/`, with no build step. It uses the game's own palette, sprites and screenshots. Its two download buttons point to
+`https://github.com/foxsoft2005/tank-siege/releases/latest/download/TankSiege-windows.zip` (and `-macos.zip`), so after each new Release the page gets the newest version with no edits. The button for the visitor's own computer is marked automatically.
+
+**Hosting:** upload the `site/` folder anywhere that serves static files: GitHub Pages, Netlify, Cloudflare Pages, or itch.io as an HTML page. The download links only work for visitors when the release files are public. For that, make this repository public, or publish the zips somewhere public (a second public repo, or itch.io) and change the two `href`s in `index.html`.
+
+To change the screenshots, replace the PNGs in `site/img/`. The page shows them at 512×416, the game's own resolution.
 
 ## Updates and auto-update
 
@@ -463,6 +474,7 @@ The letters are read by **key position** (QWERTY), so the codes also work with a
 project.godot       engine settings (window size, autoloads)
 export_presets.cfg  Windows + macOS export settings
 .github/workflows/build.yml   builds Windows + macOS on GitHub and publishes a Release
+site/               the game's website (index.html + img/)
 assets/sfx/         sound effects (.wav)
 assets/music/       chiptune music loops (.ogg)
 assets/sprites/     pixel art (.png)

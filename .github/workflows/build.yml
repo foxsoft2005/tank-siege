@@ -92,8 +92,10 @@ jobs:
         run: |
           V="${{ steps.ver.outputs.version }}"
           REPO_URL="https://github.com/${{ github.repository }}"
-          (cd build/windows && zip -q "../TankSiege-v$V-windows.zip" TankSiege.exe)
-          mv build/macos/TankSiege.zip "build/TankSiege-v$V-macos.zip"
+          # Fixed names (no version number), so a website can always link to
+          # .../releases/latest/download/TankSiege-windows.zip
+          (cd build/windows && zip -q ../TankSiege-windows.zip TankSiege.exe)
+          mv build/macos/TankSiege.zip build/TankSiege-macos.zip
           # update.json for the auto-updater (see "Updates and auto-update" in the README)
           python3 tools/make_update_manifest.py build/tank-siege.pck "$V" \
             "$REPO_URL/releases/download/v$V/tank-siege.pck" "$REPO_URL/releases/tag/v$V" "Tank Siege v$V"
@@ -105,8 +107,8 @@ jobs:
         with:
           name: TankSiege-v${{ steps.ver.outputs.version }}
           path: |
-            build/TankSiege-v*-windows.zip
-            build/TankSiege-v*-macos.zip
+            build/TankSiege-windows.zip
+            build/TankSiege-macos.zip
             build/tank-siege.pck
             build/update.json
 
@@ -117,16 +119,16 @@ jobs:
           name: Tank Siege v${{ steps.ver.outputs.version }}
           generate_release_notes: true
           body: |
-            **Windows:** download `TankSiege-v${{ steps.ver.outputs.version }}-windows.zip`, unzip, run `TankSiege.exe`.
+            **Windows:** download `TankSiege-windows.zip`, unzip, run `TankSiege.exe`.
             If Windows shows "Windows protected your PC", click **More info → Run anyway**.
 
-            **macOS:** download `TankSiege-v${{ steps.ver.outputs.version }}-macos.zip`, unzip, move **Tank Siege** to Applications.
+            **macOS:** download `TankSiege-macos.zip`, unzip, move **Tank Siege** to Applications.
             The first time, right-click the app → **Open** → **Open**. If macOS says the app is damaged, run:
             `xattr -cr "/Applications/Tank Siege.app"`
 
             `tank-siege.pck` + `update.json` are for the in-game auto-updater.
           files: |
-            build/TankSiege-v*-windows.zip
-            build/TankSiege-v*-macos.zip
+            build/TankSiege-windows.zip
+            build/TankSiege-macos.zip
             build/tank-siege.pck
             build/update.json

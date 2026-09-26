@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tank Siege</title>
+<meta name="description" content="Tank Siege: a modern take on the classic top-down tank game. Defend the core. Free for Windows and macOS.">
+<link rel="icon" href="img/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@500;600;700;800&display=swap">
+<style>
+  /* The game's own palette (scripts/ui_theme.gd, title.gd, upgrades.gd).
+     One look on purpose: the page is the game's screen, dark on any system. */
+  :root {
+    color-scheme: dark;
+    --ground: #0c0c10;       /* title screen background */
+    --panel: #1b1c24;        /* menu panels, upgrade cards */
+    --edge: #3a3d52;         /* panel borders */
+    --button: #262836;
+    --button-hover: #30334a;
+    --gold: #f2c230;         /* UITheme.ACCENT: logo, focus */
+    --gold-deep: #5a3a00;    /* logo outline */
+    --sky: #9fd8ff;          /* "defend the core" */
+    --text: #e6e8ee;
+    --muted: #c9ccd4;
+    --dim: #8a8f9e;
+    --common: #a7b0c2;
+    --rare: #4aa8ff;
+    --epic: #c27bff;
+    --green: #7dff8a;        /* player 2 */
+    --red: #ff6b4a;
+    --font: "Open Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font: 600 16px/1.55 var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; }
+  a { color: var(--sky); }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+  /* Brick strips, like the top and bottom of the title screen */
+  .bricks {
+    height: 32px;
+    background: url("img/brick.png") 0 0 / 16px 16px repeat;
+    image-rendering: pixelated;
+    filter: brightness(0.62) saturate(0.85);
+  }
+
+  .wrap { width: min(1040px, 100%); margin-inline: auto; padding-inline: 20px; }
+
+  /* ---------------------------------------------------------- hero */
+  .hero { position: relative; overflow: hidden; padding-block: 44px 56px; }
+  #attract {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    image-rendering: pixelated; pointer-events: none;
+  }
+  .hero .wrap { position: relative; display: grid; justify-items: center; text-align: center; gap: 6px; }
+  .logo {
+    margin: 0;
+    font-weight: 800;
+    font-size: clamp(3rem, 11vw, 6.6rem);
+    line-height: 1;
+    letter-spacing: 0.01em;
+    color: var(--gold);
+    paint-order: stroke fill;
+    -webkit-text-stroke: 0.16em var(--gold-deep);
+    text-shadow: 0 0.06em 0 var(--gold-deep);
+  }
+  .tagline { margin: 4px 0 0; color: var(--sky); font-size: 1.05rem; letter-spacing: 0.02em; }
+  .pitch {
+    max-width: 34em; margin: 18px 0 0; color: var(--muted); font-weight: 600;
+    text-wrap: balance;
+  }
+
+  /* The download box is the game's menu panel */
+  .menu {
+    margin-top: 28px;
+    width: min(480px, 100%);
+    background: var(--panel);
+    border: 2px solid var(--edge);
+    border-radius: 8px;
+    padding: 18px;
+    display: grid;
+    gap: 10px;
+  }
+  .menu h2 { margin: 0 0 4px; font-size: 1.35rem; font-weight: 800; color: var(--gold); letter-spacing: 0.02em; }
+  .dl {
+    display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--button);
+    border: 2px solid var(--edge);
+    border-radius: 6px;
+    color: var(--text);
+    text-decoration: none;
+    text-align: left;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .dl:hover { background: var(--button-hover); border-color: #5a5f80; color: #fff; }
+  .dl:focus-visible { outline: none; border-color: var(--gold); color: var(--gold); }
+  .dl.recommended { border-color: var(--gold); }
+  /* The player's tank as the menu cursor: frame 0 of its sprite sheet, facing right */
+  .dl .cursor {
+    width: 28px; height: 28px; visibility: hidden;
+    background: url("img/tank_player_L2.png") 0 0 / 56px 28px no-repeat;
+    image-rendering: pixelated; transform: rotate(90deg);
+  }
+  .dl.recommended .cursor, .dl:hover .cursor, .dl:focus-visible .cursor { visibility: visible; }
+  .dl strong { display: block; font-size: 1.15rem; font-weight: 800; line-height: 1.2; }
+  .dl small { display: block; color: var(--dim); font-size: 0.8rem; font-weight: 600; }
+  .dl .size { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  .menu .meta { margin: 2px 0 0; color: var(--dim); font-size: 0.8rem; }
+  .menu .meta b { color: var(--muted); font-weight: 700; }
+
+  /* ---------------------------------------------------------- sections */
+  section { padding-block: 40px; }
+  .eyebrow {
+    margin: 0 0 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--sky);
+  }
+  h2.title { margin: 0 0 20px; font-size: clamp(1.5rem, 3.4vw, 2rem); font-weight: 800; color: var(--gold); text-wrap: balance; }
+
+  /* Screenshots: a big screen + thumbnails */
+  .gallery { display: grid; grid-template-columns: 1fr 200px; gap: 14px; align-items: start; }
+  .screen {
+    margin: 0; background: #000; border: 2px solid var(--edge); border-radius: 8px; overflow: hidden;
+  }
+  .screen img { display: block; width: 100%; height: auto; aspect-ratio: 512 / 416; image-rendering: pixelated; }
+  .screen figcaption { padding: 10px 14px; background: var(--panel); color: var(--muted); font-size: 0.9rem; border-top: 2px solid var(--edge); }
+  .thumbs { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .thumbs button {
+    display: block; width: 100%; padding: 0; background: #000; cursor: pointer;
+    border: 2px solid var(--edge); border-radius: 6px; overflow: hidden;
+  }
+  .thumbs button[aria-pressed="true"] { border-color: var(--gold); }
+  .thumbs img { display: block; width: 100%; aspect-ratio: 512 / 416; image-rendering: pixelated; opacity: 0.7; transition: opacity 0.12s; }
+  .thumbs button:hover img, .thumbs button[aria-pressed="true"] img { opacity: 1; }
+
+  /* Features as upgrade cards (upgrade_screen.gd) */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card {
+    background: var(--panel); border: 2px solid var(--c); border-radius: 6px;
+    padding: 14px 16px 16px; display: grid; align-content: start; gap: 4px;
+  }
+  .card .rarity { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; color: var(--c); }
+  .card h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; }
+  .card .lv { font-size: 0.8rem; font-weight: 700; color: var(--gold); }
+  .card p { margin: 4px 0 0; color: var(--muted); font-size: 0.92rem; font-weight: 500; }
+
+  /* Controls */
+  .controls { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .pad { background: var(--panel); border: 2px solid var(--edge); border-radius: 8px; padding: 16px 18px; }
+  .pad h3 { margin: 0 0 10px; font-size: 1rem; font-weight: 800; }
+  .pad h3 .p1 { color: var(--gold); } .pad h3 .p2 { color: var(--green); }
+  .pad dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; align-items: center; }
+  .pad dt { display: flex; gap: 4px; flex-wrap: wrap; }
+  .pad dd { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  kbd {
+    display: inline-block; min-width: 1.9em; padding: 1px 7px; text-align: center;
+    font: 700 0.82rem/1.6 var(--font); color: var(--text);
+    background: var(--button); border: 1px solid #5a5f80; border-bottom-width: 3px; border-radius: 5px;
+  }
+
+  /* First launch notes */
+  .notes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .note { border-left: 3px solid var(--edge); padding: 2px 0 2px 14px; color: var(--muted); font-size: 0.92rem; font-weight: 500; }
+  .note h3 { margin: 0 0 4px; font-size: 1rem; color: var(--text); font-weight: 800; }
+  .note code {
+    display: inline-block; margin-top: 6px; padding: 4px 8px; border-radius: 4px;
+    background: var(--panel); border: 1px solid var(--edge); color: var(--sky);
+    font: 600 0.82rem/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; word-break: break-all;
+  }
+
+  footer { padding-block: 22px 28px; color: var(--dim); font-size: 0.85rem; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; align-items: center; }
+  footer .core { display: flex; align-items: center; gap: 10px; }
+  footer .core img { width: 32px; height: 32px; object-fit: cover; object-position: left; image-rendering: pixelated; }
+
+  @media (max-width: 820px) {
+    .gallery { grid-template-columns: 1fr; }
+    .thumbs { grid-template-columns: repeat(4, 1fr); }
+    .cards { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .cards, .controls, .notes { grid-template-columns: 1fr; }
+    .thumbs { grid-template-columns: repeat(2, 1fr); }
+    .dl { grid-template-columns: 1fr auto; }
+    .dl .cursor { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dl, .thumbs img { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bricks" aria-hidden="true"></div>
+
+<header class="hero">
+  <canvas id="attract" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <h1 class="logo">TANK SIEGE</h1>
+    <p class="tagline">defend the core</p>
+    <p class="pitch">The classic top-down tank battle, rebuilt: pixel-art tanks, smarter enemies, two bosses, roguelite upgrades between stages and two-player co-op on one keyboard.</p>
+
+    <nav class="menu" aria-labelledby="dl-title">
+      <h2 id="dl-title">DOWNLOAD</h2>
+      <a class="dl" id="dl-windows" href="https://github.com/foxsoft2005/tank-siege/releases/latest/download/TankSiege-windows.zip">
+        <span class="cursor" aria-hidden="true"></span>
+        <span><strong>Windows</strong><small>Windows 10 or 11 · 64-bit</small></span>
+        <span class="size">36 MB</span>
+      </a>
+      <a class="dl" id="dl-macos" href="https://github.com/foxsoft2005/tank-siege/releases/latest/download/TankSiege-macos.zip">
+        <span class="cursor" aria-hidden="true"></span>
+        <span><strong>macOS</strong><small>macOS 11 or newer · Apple Silicon and Intel</small></span>
+        <span class="size">65 MB</span>
+      </a>
+      <p class="meta">Version <b>1.5.0</b> · free · no install, just unzip and play</p>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section id="screens">
+    <div class="wrap">
+      <p class="eyebrow">Screenshots</p>
+      <h2 class="title">Twenty tanks per stage. One core to protect.</h2>
+      <div class="gallery">
+        <figure class="screen">
+          <img id="shot" src="img/battle.png" alt="Stage 3: the player's gold tank guards the glowing core while purple and green enemy tanks move through brick and steel walls." width="512" height="416">
+          <figcaption id="shot-caption">Stage 3. Bricks break, steel doesn't, and the enemies know where your core is.</figcaption>
+        </figure>
+        <ul class="thumbs" aria-label="Choose a screenshot">
+          <li><button type="button" aria-pressed="true" data-src="img/battle.png" data-alt="Stage 3: the player's gold tank guards the glowing core while enemy tanks move through brick and steel walls." data-caption="Stage 3. Bricks break, steel doesn't, and the enemies know where your core is."><img src="img/battle.png" alt="Battle"></button></li>
+          <li><button type="button" aria-pressed="false" data-src="img/boss.png" data-alt="The Sky Raider gunship boss hovers over the map with its health bar at the top, as an achievement pops up." data-caption="The Sky Raider flies over walls, so there's nowhere to hide. Every tenth stage."><img src="img/boss.png" alt="Gunship boss"></button></li>
+          <li><button type="button" aria-pressed="false" data-src="img/cards.png" data-alt="Stage 4 clear screen offering three upgrade cards: Field Repair, Rapid Loader and Swift Treads." data-caption="Clear a stage, pick 1 of 3 upgrade cards. Every run builds a different tank."><img src="img/cards.png" alt="Upgrade cards"></button></li>
+          <li><button type="button" aria-pressed="false" data-src="img/stats.png" data-alt="Stage 4 clear stats: a tally of destroyed tanks by type, accuracy 81 percent, awards and new achievements." data-caption="After every stage: the kill tally, your accuracy, awards and new achievements."><img src="img/stats.png" alt="Stats screen"></button></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <p class="eyebrow">What's inside</p>
+      <h2 class="title">Choose your upgrades</h2>
+      <div class="cards">
+        <article class="card" style="--c: var(--epic)">
+          <span class="rarity">EPIC</span>
+          <h3>Roguelite cards</h3>
+          <span class="lv">NEW EVERY STAGE</span>
+          <p>Ricochet shells, guard drones, blast rounds, twin cannons. Stack them into a build that fits how you play.</p>
+        </article>
+        <article class="card" style="--c: var(--rare)">
+          <span class="rarity">RARE</span>
+          <h3>Enemies that think</h3>
+          <span class="lv">8 TANK TYPES</span>
+          <p>Raiders pathfind to your core, hunters track you, snipers aim, kamikazes charge, and engineers rebuild the walls you break.</p>
+        </article>
+        <article class="card" style="--c: var(--red)">
+          <span class="rarity">BOSS</span>
+          <h3>Fortress and Sky Raider</h3>
+          <span class="lv">EVERY 5TH STAGE</span>
+          <p>A walking fortress with three phases, and a gunship that strafes whole rows of the map.</p>
+        </article>
+        <article class="card" style="--c: var(--green)">
+          <span class="rarity">CO-OP</span>
+          <h3>Two players</h3>
+          <span class="lv">ONE KEYBOARD</span>
+          <p>Local co-op with your own lives and star levels. Two gamepads work too.</p>
+        </article>
+        <article class="card" style="--c: var(--common)">
+          <span class="rarity">COMMON</span>
+          <h3>Level editor</h3>
+          <span class="lv">BUILD AND SHARE</span>
+          <p>Draw your own maps with ice, mud, conveyor belts, teleporters and barrels that chain-explode.</p>
+        </article>
+        <article class="card" style="--c: var(--gold)">
+          <span class="rarity">GARAGE</span>
+          <h3>Keep progressing</h3>
+          <span class="lv">33 ACHIEVEMENTS</span>
+          <p>Earn scrap to unlock tanks and perks. Three difficulty levels, each with its own high score.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="controls">
+    <div class="wrap">
+      <p class="eyebrow">Controls</p>
+      <h2 class="title">Easy to pick up</h2>
+      <div class="controls">
+        <div class="pad">
+          <h3><span class="p1">Player 1</span></h3>
+          <dl>
+            <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Drive</dd>
+            <dt><kbd>Space</kbd></dt><dd>Fire (hold to keep firing)</dd>
+            <dt><kbd>P</kbd><kbd>Esc</kbd></dt><dd>Pause and options</dd>
+          </dl>
+        </div>
+        <div class="pad">
+          <h3><span class="p2">Player 2</span> <span style="color:var(--dim);font-weight:600">in co-op</span></h3>
+          <dl>
+            <dt><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></dt><dd>Drive</dd>
+            <dt><kbd>Enter</kbd></dt><dd>Fire</dd>
+            <dt><kbd>M</kbd><kbd>N</kbd></dt><dd>Mute sound / music</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="first-launch">
+    <div class="wrap">
+      <p class="eyebrow">First launch</p>
+      <h2 class="title">If your computer asks</h2>
+      <div class="notes">
+        <div class="note">
+          <h3>Windows</h3>
+          Unzip and run <b>TankSiege.exe</b>. If you see “Windows protected your PC”, click <b>More info</b>, then <b>Run anyway</b>.
+        </div>
+        <div class="note">
+          <h3>macOS</h3>
+          Unzip and move <b>Tank Siege</b> to Applications. The first time, right-click the app, choose <b>Open</b>, then <b>Open</b> again. If macOS says the app is damaged, run this in Terminal:<br>
+          <code>xattr -cr "/Applications/Tank Siege.app"</code>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="core"><img src="img/base.png" alt="" width="32" height="32"> Tank Siege v1.5.0 · made with Godot 4.5</span>
+    <span>Your progress stays on your computer.</span>
+  </div>
+</footer>
+
+<div class="bricks" aria-hidden="true"></div>
+
+<script>
+  // Put the download for this visitor's computer first and mark it.
+  (function () {
+    var ua = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.userAgent || "";
+    var isMac = /mac/i.test(ua) && !/iphone|ipad/i.test(navigator.userAgent);
+    var win = document.getElementById("dl-windows");
+    var mac = document.getElementById("dl-macos");
+    var pick = isMac ? mac : (/win/i.test(ua) ? win : null);
+    if (!pick) return;
+    pick.classList.add("recommended");
+    if (pick === mac) mac.parentNode.insertBefore(mac, win);
+  })();
+
+  // Screenshot gallery
+  (function () {
+    var shot = document.getElementById("shot");
+    var caption = document.getElementById("shot-caption");
+    var buttons = document.querySelectorAll(".thumbs button");
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        shot.src = b.dataset.src;
+        shot.alt = b.dataset.alt;
+        caption.textContent = b.dataset.caption;
+        buttons.forEach(function (o) { o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
+      });
+    });
+  })();
+
+  // Attract mode: tanks driving across behind the logo, like the title screen.
+  (function () {
+    var canvas = document.getElementById("attract");
+    var ctx = canvas.getContext("2d");
+    var names = ["tank_player_L2", "tank_basic", "tank_fast", "tank_power", "tank_armor", "tank_sniper", "tank_kamikaze", "tank_player2_L1"];
+    var sprites = {};
+    var tanks = [];
+    var still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var W = 0, H = 0, last = 0;
+
+    function resize() {
+      var r = canvas.getBoundingClientRect();
+      W = Math.max(1, Math.round(r.width));
+      H = Math.max(1, Math.round(r.height));
+      canvas.width = W;
+      canvas.height = H;
+      ctx.imageSmoothingEnabled = false;
+    }
+
+    function setup() {
+      // Two lanes, like title.gd: tanks going right up top, left down below.
+      tanks = names.map(function (n, i) {
+        var top = i % 2 === 0;
+        return {
+          sprite: n,
+          x: Math.random() * W,
+          y: top ? 22 + (i % 3) * 6 : H - 22 - (i % 3) * 6,  // along the edges, clear of the text
+          speed: (top ? 1 : -1) * (32 + Math.random() * 26),
+        };
+      });
+    }
+
+    function draw(t) {
+      var dt = last ? Math.min((t - last) / 1000, 0.05) : 0;
+      last = t;
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalAlpha = 0.42;  // dimmed, so the text stays readable
+      tanks.forEach(function (k) {
+        k.x += k.speed * dt;
+        if (k.x > W + 40) k.x = -40;
+        if (k.x < -40) k.x = W + 40;
+        var img = sprites[k.sprite];
+        if (!img) return;
+        var frame = Math.floor(t / 120) % 2;  // treads roll: swap the two frames
+        ctx.save();
+        ctx.translate(Math.round(k.x), Math.round(k.y));
+        ctx.rotate(k.speed > 0 ? Math.PI / 2 : -Math.PI / 2);  // sprites face up
+        ctx.drawImage(img, frame * 16, 0, 16, 16, -16, -16, 32, 32);
+        ctx.restore();
+      });
+      ctx.globalAlpha = 1;
+      if (!still) requestAnimationFrame(draw);
+    }
+
+    var loaded = 0;
+    names.forEach(function (n) {
+      var img = new Image();
+      img.onload = function () {
+        sprites[n] = img;
+        if (++loaded === names.length && still) draw(0);
+      };
+      img.src = "img/" + n + ".png";
+    });
+    resize();
+    setup();
+    window.addEventListener("resize", function () { resize(); setup(); });
+    if (!still) requestAnimationFrame(draw);
+  })();
+</script>
+</body>
+</html>
