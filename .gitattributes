@@ -1,0 +1,6 @@
+# Normalize line endings for text; keep binary assets untouched
+* text=auto eol=lf
+*.png binary
+*.wav binary
+*.ogg binary
+*.ttf binary

@@ -1,0 +1,35 @@
+; Engine configuration file.
+; Open this folder with Godot 4.5 (Project Manager -> Import -> pick this file).
+
+config_version=5
+
+[application]
+
+config/name="Tank Siege"
+config/description="A modern take on the classic top-down tank game. Beginner-friendly Godot 4 starter."
+run/main_scene="res://scenes/title.tscn"
+config/features=PackedStringArray("4.5", "GL Compatibility")
+config/icon="res://assets/sprites/icon.png"
+config/version="1.4.1"
+
+[autoload]
+
+Updater="*res://scripts/updater.gd"
+GameState="*res://scripts/game_state.gd"
+Music="*res://scripts/music.gd"
+Sfx="*res://scripts/sfx.gd"
+Settings="*res://scripts/settings.gd"
+
+[display]
+
+window/size/viewport_width=512
+window/size/viewport_height=416
+window/size/window_width_override=1024
+window/size/window_height_override=832
+window/stretch/mode="canvas_items"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.08, 0.08, 0.1, 1)
