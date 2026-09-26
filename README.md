@@ -315,14 +315,14 @@ All the art is in `assets/sprites/`: 6 tank colors with 2 tread frames each, bri
    git tag v1.5.1
    git push origin main v1.5.1
    ```
-3. Wait about 5 minutes. A new release appears on the repo's **Releases** page with:
+3. Wait a minute or two. A new release appears on the repo's **Releases** page with:
    - `TankSiege-v1.5.1-windows.zip`, a single `.exe`
    - `TankSiege-v1.5.1-macos.zip`, a universal `.app` for Apple Silicon and Intel
    - `tank-siege.pck` and `update.json`, for the auto-updater
 
 To just try a build without a release, open the **Actions** tab → **Build game** → **Run workflow**. The zips appear under **Artifacts** on that run's page. If the tag doesn't match the game version, the build stops with a clear error, so a release can never ship with the wrong number.
 
-It all runs on a Linux machine, because Godot can export Windows and Mac games from Linux. For a private repo, GitHub gives 2,000 free build minutes a month, and one build takes about 5.
+It all runs on a Linux machine, because Godot can export Windows and Mac games from Linux. For a private repo, GitHub gives 2,000 free build minutes a month, and one build takes 1–2.
 
 **By hand, in the Godot editor:**
 1. Go to **Editor → Manage Export Templates → Download and Install** (once).
