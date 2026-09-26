@@ -10,6 +10,7 @@ var team: Tank.Team
 var dir: Vector2
 var speed: float
 var power: int
+var player_index := -1  # which player fired it (-1 = an enemy), for the stats
 
 # Upgrade powers (set by Player._configure_bullet)
 var bounces_left := 0   # Ricochet
@@ -17,6 +18,7 @@ var pierce_left := 0    # Piercing Rounds
 var blast := false      # Blast Shells
 
 var _done := false
+var _hit_counted := false  # accuracy counts a shell once, even if it pierces
 
 
 func _init(p_team: Tank.Team, p_dir: Vector2, p_speed: float, p_power: int, p_shooter: Tank = null) -> void:
@@ -60,6 +62,11 @@ func _on_body_entered(body: Node2D) -> void:
 		var tank := body as Tank
 		if tank.team == team:
 			return  # no friendly fire, fly through
+		if player_index >= 0:
+			tank.last_hit_by = player_index
+			if shooter != null and not _hit_counted:  # (drone shells don't count as shots)
+				_hit_counted = true
+				GameState.track("hits", 1, player_index)
 		tank.hit(dir, power)
 		if blast:
 			_blast(tank)
@@ -72,7 +79,9 @@ func _on_body_entered(body: Node2D) -> void:
 		var level := get_tree().get_first_node_in_group("level") as Level
 		var steel_holds := wall.kind == Wall.Kind.STEEL and power < 2
 		Sfx.play("hit_steel" if steel_holds else "hit_brick", -2.0)
+		var walls_before := level.walls.size()
 		level.damage(wall.cell, dir, position, power)
+		_count_smashed(level, walls_before)
 		if blast:
 			_blast(null)
 		_bounce_or_finish()
@@ -88,6 +97,8 @@ func _on_area_entered(area: Area2D) -> void:
 	# Two shells from opposite teams cancel each other out.
 	if area is Bullet and (area as Bullet).team != team and not _done:
 		Sfx.play("hit_steel", -6.0)
+		if player_index >= 0:
+			GameState.track("cancels", 1, player_index)  # shot an enemy shell out of the air
 		(area as Bullet)._finish()
 		_finish()
 
@@ -109,11 +120,22 @@ func _blast(already_hit: Tank) -> void:
 	Fx.explosion(get_parent(), position, false)
 	Sfx.play("explode_small", -4.0, 0.15)
 	var level := get_tree().get_first_node_in_group("level") as Level
+	var walls_before := level.walls.size()
 	level.damage_radius(position, BLAST_RADIUS, power)
+	_count_smashed(level, walls_before)
 	for node in get_tree().get_nodes_in_group("tanks"):
 		var t := node as Tank
 		if t != already_hit and t.team != team and t.position.distance_to(position) < BLAST_RADIUS + 13.0:
+			if player_index >= 0:
+				t.last_hit_by = player_index
 			t.hit()
+
+
+## Stats: how many wall pieces did this shell just knock out?
+func _count_smashed(level: Level, walls_before: int) -> void:
+	var smashed := walls_before - level.walls.size()
+	if player_index >= 0 and smashed > 0:
+		GameState.track("bricks", smashed, player_index)
 
 
 func _finish() -> void:

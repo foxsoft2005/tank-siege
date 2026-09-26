@@ -55,6 +55,18 @@ var perks := {}  # perk id -> level
 
 var _run_over := false  # so a run's rewards are only paid out once
 
+# Statistics (see track()). Three sets of the same counters:
+#   stage_stats - this stage only (the stats screen after a stage)
+#   run_stats   - the whole run (the stats screen at game over)
+#   lifetime    - every run ever, saved to disk (counter achievements)
+# Keys are plain strings: "shots", "kills", "kills.fast", "bricks"... and
+# the per-player copies "p0.shots", "p1.kills.fast" (for co-op columns).
+var stage_stats := {}
+var run_stats := {}
+var lifetime := {}
+var achievements := {}  # achievement id -> unix time it was unlocked (saved)
+var run_achievements: Array[String] = []  # unlocked during this run (game over screen)
+
 
 func _ready() -> void:
 	_setup_input()
@@ -150,6 +162,8 @@ func save_progress() -> void:
 	cfg.set_value("meta", "unlocked_tanks", unlocked_tanks)
 	cfg.set_value("meta", "selected_tank", selected_tank)
 	cfg.set_value("meta", "perks", perks)
+	cfg.set_value("stats", "lifetime", lifetime)
+	cfg.set_value("stats", "achievements", achievements)
 	cfg.save(SAVE_PATH)
 
 
@@ -168,6 +182,8 @@ func load_progress() -> void:
 	unlocked_tanks = cfg.get_value("meta", "unlocked_tanks", ["scout"])
 	selected_tank = cfg.get_value("meta", "selected_tank", "scout")
 	perks = cfg.get_value("meta", "perks", {})
+	lifetime = cfg.get_value("stats", "lifetime", {})
+	achievements = cfg.get_value("stats", "achievements", {})
 	if not Garage.TANKS.has(selected_tank) or selected_tank not in unlocked_tanks:
 		selected_tank = "scout"
 
@@ -184,12 +200,47 @@ func reset() -> void:
 	upgrades.clear()
 	cheats_used = god_mode or disco
 	_run_over = false
+	run_stats = {}
+	stage_stats = {}
+	run_achievements.clear()
 	if perk("head_start") > 0:  # a free common card to start with
 		var commons: Array[String] = []
 		for id: String in Upgrades.ALL:
 			if Upgrades.ALL[id]["rarity"] == Upgrades.Rarity.COMMON and id != "field_repair":
 				commons.append(id)
 		add_upgrade(commons.pick_random())
+
+
+# ---------------------------------------------------------------- statistics
+
+## Count something that happened: GameState.track("shots"), or
+## GameState.track("kills.fast", 1, 0) for a kill by Player 1.
+## `player` >= 0 also counts it in that player's own column ("p0.kills.fast").
+## Lifetime totals (and the achievements that watch them) only count in
+## runs without cheats, so KABOOM can't farm "destroy 1000 tanks".
+func track(key: String, amount := 1, player := -1) -> void:
+	_bump(key, amount, true)
+	if player >= 0:
+		_bump("p%d.%s" % [player, key], amount, false)
+
+
+func _bump(key: String, amount: int, count_lifetime: bool) -> void:
+	stage_stats[key] = stage_stats.get(key, 0) + amount
+	run_stats[key] = run_stats.get(key, 0) + amount
+	if count_lifetime and not cheats_used:
+		lifetime[key] = lifetime.get(key, 0) + amount
+		Achievements.on_stat(key, lifetime[key])
+
+
+## Remember the biggest value seen, e.g. the best combo of the stage.
+func track_max(key: String, value: int) -> void:
+	stage_stats[key] = maxi(stage_stats.get(key, 0), value)
+	run_stats[key] = maxi(run_stats.get(key, 0), value)
+
+
+## Read a counter. `which` is stage_stats, run_stats or lifetime.
+static func stat(which: Dictionary, key: String, player := -1) -> int:
+	return which.get(key if player < 0 else "p%d.%s" % [player, key], 0)
 
 
 ## Level of an upgrade you own (0 = don't have it). See upgrades.gd.

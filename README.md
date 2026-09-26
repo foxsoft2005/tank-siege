@@ -207,11 +207,50 @@ All 5 Garage tanks have all 4 shapes (`assets/sprites/tank_<color>_L0..L3.png`).
 
 ## Game over
 
-When the game ends, whether you ran out of lives or the core fell, **everything stops where it is**. Tanks freeze, and shells in flight fizzle out. Explosions and score popups still finish playing. See `_freeze_battlefield()` in `main.gd`: switching off `_physics_process` on every tank freezes its movement, AI and shooting in one go.
+When the game ends, whether you ran out of lives or the core fell, **everything stops where it is**. Tanks freeze, and shells in flight fizzle out. Explosions and score popups still finish playing. See `_freeze_battlefield()` in `main.gd`: switching off `_physics_process` on every tank freezes its movement, AI and shooting in one go. After a moment, the run's stats screen appears with **Retry** and **Main menu** buttons. Enter still works as a quick retry before it appears.
+
+## Stats screen
+
+After every stage there's a **stats screen**, and at game over there's one for the whole run:
+
+- **DESTROYED**: a tally like the original game. There's one row per enemy type, and the counter blips up one tank at a time. In co-op there's a column for each player.
+- **The numbers**: time, shells fired, accuracy, best combo, wall pieces smashed, power-ups, enemy shells shot down, armor lost and score. At game over you also see stages cleared, a new high score and the scrap you earned.
+- **AWARDS** (stage only): small score bonuses for playing well.
+
+| Award | For | Bonus |
+|---|---|---|
+| No Scratch | taking no damage | +1000 |
+| Sharpshooter | 75%+ of your shells hitting | +500 |
+| Blitz | clearing the stage in under 1:30 | +500 |
+| Combo King | a x5 combo or better | +500 |
+| Wrecking Ball | 40+ wall pieces smashed | +300 |
+| Hoarder | 3+ power-ups | +300 |
+| MVP P1/P2 | co-op: most tanks destroyed | +1000 |
+
+- **ACHIEVEMENTS**: any you unlocked during the stage or run.
+
+Press **Fire / Enter** once to skip the animation, then again to continue to the upgrade cards. At game over, choose **Retry** or **Main menu**.
+
+**How it works:** `GameState.track("shots", 1, player_index)` counts things as they happen: in `bullet.gd` (hits, walls, shells shot down), `player.gd` (shots, armor lost), `main.gd` (kills, deaths, power-ups) and `level.gd` (teleports). Every counter goes into three dictionaries:
+- `stage_stats`, for this stage's screen
+- `run_stats`, for the game-over screen
+- `lifetime`, which is saved and used by achievements
+
+Kills know who made them because each shell sets `tank.last_hit_by` to its player index before it hits. Awards are in `Main._stage_medals()`, and the screen itself is `stats_screen.gd`.
+
+## Achievements
+
+There are 33 achievements, in bronze, silver and gold. When you unlock one, an "ACHIEVEMENT UNLOCKED" popup slides in. Open **Achievements** on the title screen to see them all, with progress for the counting ones ("37 / 100"). A few are **secret**, and they show as "SECRET" until you find them.
+
+A sample: *First Blood*, *Tank Buster* (100 kills), *Scrapyard Legend* (1,000), *LEGENDARY!* (a 12-kill combo), *Bomb Squad* (4 tanks with one Bomb), *Eagle Eye* (destroy a Sniper while its laser is on you), *Hot Potato* (shoot a lit Kamikaze), *Untouchable*, *Sharpshooter*, *Ammo Miser* (clear a stage with fewer than 40 shells), *Tiptoe* (clear a stage without breaking a single wall), *Last Stand*, *Brothers in Arms* (co-op), *Hard Boiled* (stage 5 on Hard), *Frequent Flyer* (25 teleports), *Never Give Up* (lose 50 tanks)...
+
+Runs with **cheats don't unlock achievements or count toward the totals**, except for a couple of secret ones that are about cheating. Custom levels only give *Architect*, so a tiny homemade map can't farm the stage feats.
+
+**Add your own:** add a line to `LIST` in `achievements.gd`. For a counter, give it a `"stat"` and a `"goal"` (any `GameState.track()` key). For anything else, call `Achievements.unlock("your_id")` where it happens. The popup and the title screen list pick it up automatically. Unlocked achievements and lifetime totals are saved in `user://save.cfg`.
 
 ## Title screen and high score
 
-The title screen has **Play**, **Garage**, **Custom levels**, **Level editor**, **Options** and **Quit**. Tanks drive past in the background. Your best score and stage are saved to `user://save.cfg`. Custom levels and runs where you used cheats don't count toward the high score.
+The title screen has **Play**, **Garage**, **Achievements**, **Custom levels**, **Level editor**, **Options** and **Quit**. Tanks drive past in the background. Your best score and stage are saved to `user://save.cfg`. Custom levels and runs where you used cheats don't count toward the high score.
 
 The game has three scenes: `title.tscn`, `main.tscn` (the game) and `editor.tscn`. You move between them with `get_tree().change_scene_to_file(...)`. `GameState` (an autoload) carries information across, such as which level to play and where to return afterwards.
 
@@ -437,6 +476,9 @@ scripts/
   ui_theme.gd       the menu's look (a Theme built in code)
   art.gd            loads sprites and draws sprite-sheet frames
   cheat_codes.gd    secret code detector
+  achievements.gd   autoload: the achievement list, unlocking, the popup
+  medal_icon.gd     the bronze / silver / gold medal drawn in code
+  stats_screen.gd   the stats screen after a stage and at game over
   layers.gd         named physics layers
 ```
 

@@ -10,7 +10,7 @@ config/description="A modern take on the classic top-down tank game. Beginner-fr
 run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://assets/sprites/icon.png"
-config/version="1.4.1"
+config/version="1.5.0"
 
 [autoload]
 
@@ -19,6 +19,7 @@ GameState="*res://scripts/game_state.gd"
 Music="*res://scripts/music.gd"
 Sfx="*res://scripts/sfx.gd"
 Settings="*res://scripts/settings.gd"
+Achievements="*res://scripts/achievements.gd"
 
 [display]
 

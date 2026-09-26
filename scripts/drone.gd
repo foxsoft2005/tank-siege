@@ -35,6 +35,8 @@ func _physics_process(delta: float) -> void:
 	_cooldown = FIRE_INTERVAL
 	var aim := (target.global_position - global_position).normalized()
 	var b := Bullet.new(host.team, aim, SHELL_SPEED, 1)
+	if host is Player:
+		b.player_index = (host as Player).index  # kills count for the drone's owner
 	b.position = global_position
 	host.get_parent().add_child(b)
 	Sfx.play("drone_shoot", -3.0)

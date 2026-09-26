@@ -49,6 +49,10 @@ var fortify_time := 0.0
 var shake := 0.0
 var music_delay := 0.9  # start the music once the stage jingle has finished
 
+var stage_time := 0.0   # seconds played this stage (for the stats screen)
+var _stage_start_score := 0
+var _stage_achievements: Array[String] = []  # unlocked during this stage
+
 var combo := 0          # kills in the current chain
 var combo_timer := 0.0  # seconds left before the chain breaks
 var _hitstop_end := 0   # real-time msec when the hit-stop freeze ends
@@ -81,7 +85,15 @@ func _ready() -> void:
 
 	level = Level.new()
 	world.add_child(level)
-	level.barrel_exploded.connect(func(_pos: Vector2) -> void: shake = maxf(shake, 9.0))
+	level.barrel_exploded.connect(func(_pos: Vector2) -> void:
+		shake = maxf(shake, 9.0)
+		GameState.track("barrels"))
+	GameState.stage_stats = {}  # fresh numbers for this stage's stats screen
+	_stage_start_score = GameState.score
+	Achievements.unlocked.connect(func(id: String) -> void:
+		_stage_achievements.append(id)
+		GameState.run_achievements.append(id))
+	_check_progress_achievements()
 	# A custom level from the editor, or the next campaign stage.
 	boss_stage = not GameState.is_custom() and LevelData.is_boss_stage(GameState.stage)
 	level.build(GameState.custom_map if GameState.is_custom() else LevelData.get_map(GameState.stage))
@@ -137,6 +149,11 @@ func _process(delta: float) -> void:
 
 	if get_tree().paused or state != State.PLAYING:
 		return
+
+	stage_time += delta
+	# Secret achievement: a whole minute on the battlefield without firing.
+	if stage_time >= 60.0 and GameState.stat(GameState.stage_stats, "shots") == 0 and _alive_players().size() > 0:
+		Achievements.unlock("sunday_drive")
 
 	if boss_delay > 0.0:
 		boss_delay -= delta
@@ -224,6 +241,7 @@ func _on_cheat(id: String) -> void:
 		return
 	GameState.cheats_used = true
 	Sfx.play("cheat", 0.0, 0.0)
+	Achievements.unlock("cheater")
 	var text := ""
 	match id:
 		"god_mode":
@@ -395,11 +413,94 @@ func _pick_brain(kind: Enemy.Kind) -> Enemy.Brain:
 func _on_enemy_died(tank: Tank) -> void:
 	var e := tank as Enemy
 	enemies_alive -= 1
+	_track_kill(e, "kills." + (Enemy.Kind.keys()[e.kind] as String).to_lower())
 	_register_kill(e.position, e.points)
 	shake = maxf(shake, 4.0)
 	if e.is_bonus:
 		_drop_powerup()
 	_check_stage_clear()
+
+
+## Stats: count a destroyed enemy (for the player whose shell got it, if any)
+## and check the achievements that care HOW it was destroyed.
+func _track_kill(t: Tank, kind_key: String) -> void:
+	var who := t.last_hit_by
+	GameState.track("kills", 1, who)
+	GameState.track(kind_key, 1, who)
+	if who < 0:
+		return
+	if t is SniperEnemy and (t as SniperEnemy)._aim > 0.0:
+		Achievements.unlock("eagle_eye")
+	if t is KamikazeEnemy and (t as KamikazeEnemy)._fuse >= 0.0:
+		Achievements.unlock("hot_potato")
+	if GameState.disco:
+		Achievements.unlock("night_fever")
+
+
+## "Reach stage N" achievements, checked as each stage starts.
+func _check_progress_achievements() -> void:
+	if GameState.is_custom():
+		return
+	var s := GameState.stage
+	if s >= 5:
+		Achievements.unlock("stage_5")
+		if GameState.difficulty == Difficulty.Level.HARD:
+			Achievements.unlock("hard_5")
+	if s >= 10:
+		Achievements.unlock("stage_10")
+	if s >= 20:
+		Achievements.unlock("stage_20")
+
+
+## Stage-feat achievements, checked when a stage is cleared. (Custom levels
+## only give "Architect": otherwise a tiny homemade map would make them easy.)
+func _check_stage_achievements() -> void:
+	if GameState.is_custom():
+		Achievements.unlock("architect")
+		return
+	var st := GameState.stage_stats
+	var shots := GameState.stat(st, "shots")
+	var hits := GameState.stat(st, "hits")
+	if GameState.stat(st, "armor_lost") == 0 and GameState.stat(st, "deaths") == 0:
+		Achievements.unlock("untouchable")
+	if shots >= 20 and hits * 100 >= shots * 80:
+		Achievements.unlock("sharpshooter")
+	if stage_time < 75.0:
+		Achievements.unlock("speed_demon")
+	if shots < 40:
+		Achievements.unlock("ammo_miser")
+	if GameState.stat(st, "bricks") == 0:
+		Achievements.unlock("tiptoe")
+	if _lives_left() == 1:
+		Achievements.unlock("last_stand")
+	if GameState.coop:
+		Achievements.unlock("buddies")
+
+
+## Stage awards for the stats screen: small score bonuses for playing well.
+## Each is {name, desc, bonus, tier}. Add your own here!
+func _stage_medals() -> Array:
+	var st := GameState.stage_stats
+	var shots := GameState.stat(st, "shots")
+	var out := []
+	if shots >= 10 and GameState.stat(st, "hits") * 100 >= shots * 75:
+		out.append({"name": "SHARPSHOOTER", "desc": "75%+ of your shells hit", "bonus": 500, "tier": 1})
+	if GameState.stat(st, "armor_lost") == 0:
+		out.append({"name": "NO SCRATCH", "desc": "No damage taken", "bonus": 1000, "tier": 2})
+	if stage_time < 90.0:
+		out.append({"name": "BLITZ", "desc": "Cleared in under 1:30", "bonus": 500, "tier": 1})
+	if GameState.stat(st, "best_combo") >= 5:
+		out.append({"name": "COMBO KING", "desc": "A x5 combo or better", "bonus": 500, "tier": 1})
+	if GameState.stat(st, "bricks") >= 40:
+		out.append({"name": "WRECKING BALL", "desc": "40+ wall pieces smashed", "bonus": 300, "tier": 0})
+	if GameState.stat(st, "powerups") >= 3:
+		out.append({"name": "HOARDER", "desc": "3+ power-ups collected", "bonus": 300, "tier": 0})
+	if GameState.coop:  # like the original: a bonus for whoever destroyed the most
+		var k1 := GameState.stat(st, "kills", 0)
+		var k2 := GameState.stat(st, "kills", 1)
+		if k1 != k2:
+			out.append({"name": "MVP P%d" % (1 if k1 > k2 else 2), "desc": "Most tanks destroyed", "bonus": 1000, "tier": 2})
+	return out
 
 
 func _check_stage_clear() -> void:
@@ -449,6 +550,10 @@ func _on_boss_died(tank: Tank) -> void:
 	var pos := tank.position
 	_boss_bar.visible = false
 	GameState.bosses_killed += 1
+	var is_gunship := tank is Gunship
+	_track_kill(tank, "kills.gunship" if is_gunship else "kills.fortress")
+	GameState.track("bosses")
+	Achievements.unlock("clear_skies" if is_gunship else "fortress_breaker")
 	_register_kill(pos, boss.points)
 	FloatingText.spawn(world, pos + Vector2(0, -30), "%s DESTROYED!" % boss.display_name, Color("#ff7a3c"), 18)
 	hit_stop(0.35)
@@ -469,6 +574,7 @@ func _on_boss_died(tank: Tank) -> void:
 func _on_player_died(tank: Tank) -> void:
 	var index := (tank as Player).index
 	shake = 8.0
+	GameState.track("deaths", 1, index)
 	GameState.lives_p[index] -= 1
 	if not GameState.diff("keep_star_on_death"):
 		GameState.stars_p[index] = 0  # dying costs your star level (not your upgrade cards)
@@ -498,23 +604,43 @@ func _stage_clear() -> void:
 	if state != State.PLAYING:
 		return
 	state = State.STAGE_CLEAR
-	_show_message("STAGE CLEAR!")
+	_show_message("LEVEL COMPLETE!" if GameState.is_custom() else "STAGE CLEAR!")
 	Sfx.play("stage_clear", 0.0, 0.0)
 	Music.stop(0.3)
-	if GameState.is_custom():
-		# Custom levels are a single stage: celebrate, then go back.
-		_show_message("LEVEL COMPLETE!\nscore %d" % GameState.score)
-		await get_tree().create_timer(2.5).timeout
-		get_tree().change_scene_to_file(GameState.return_scene)
-		return
+	GameState.track("time_ms", int(stage_time * 1000.0))
+	GameState.track("stages_cleared")
+	_check_stage_achievements()
+	GameState.save_progress()  # lifetime stats + achievements
 	await get_tree().create_timer(1.5).timeout
 	_message_label.text = ""
+
+	# The stats screen: tally, numbers, awards. Awards add a score bonus.
+	get_tree().paused = true
+	Music.play("upgrade", 1.0)
+	var medals := _stage_medals()
+	for m: Dictionary in medals:
+		GameState.score += m["bonus"]
+	var stats_screen := StatsScreen.new({
+		"title": ("%s COMPLETE" % GameState.custom_name.to_upper()) if GameState.is_custom() else "STAGE %d CLEAR" % GameState.stage,
+		"subtitle": Difficulty.NAMES[GameState.difficulty] + ("  ·  CO-OP" if GameState.coop else ""),
+		"stats": GameState.stage_stats,
+		"time": stage_time,
+		"score_line": "+%d" % (GameState.score - _stage_start_score),
+		"medals": medals,
+		"achievements": _stage_achievements,
+	})
+	add_child(stats_screen)
+	await stats_screen.closed
+	if GameState.is_custom():
+		# Custom levels are a single stage: back to where we came from.
+		get_tree().paused = false
+		Music.stop(0.3)
+		get_tree().change_scene_to_file(GameState.return_scene)
+		return
 
 	# Pause the game and let the player pick 1 of 3 upgrade cards.
 	# `await screen.picked` waits right here until the signal fires,
 	# and gives us the value it was emitted with.
-	get_tree().paused = true
-	Music.play("upgrade", 1.0)
 	# Garage perks: Wide Choice shows a 4th card, Reroll adds a reroll button.
 	var count := 3 + GameState.perk("fourth_card")
 	var screen := UpgradeScreen.new(Upgrades.roll_choices(GameState.upgrades, count), GameState.stage,
@@ -539,19 +665,44 @@ func _game_over() -> void:
 	Music.stop(1.0)
 	# Wait for the explosion to ring out before the sad jingle.
 	get_tree().create_timer(0.8).timeout.connect(Sfx.play.bind("game_over", 0.0, 0.0))
-	var extra := ""
-	var result := GameState.end_run()
+	GameState.track("time_ms", int(stage_time * 1000.0))
+	var extra: Array[String] = []
+	var result := GameState.end_run()  # (also saves the lifetime stats)
 	if result["record"]:
-		extra += "\nNEW HIGH SCORE!"
+		extra.append("NEW HIGH SCORE!")
 	elif GameState.cheats_used:
-		extra += "\n(cheats used)"
+		extra.append("(cheats used: no records)")
 	if result["scrap"] > 0:
-		extra += "\n+%d scrap" % result["scrap"]
+		extra.append("+%d scrap for the Garage" % result["scrap"])
+	GameState.save_progress()
+	_message_label.add_theme_font_size_override("font_size", 40)
+	_show_message("GAME OVER")
+	await get_tree().create_timer(2.2).timeout
+	if not is_inside_tree() or state != State.GAME_OVER:
+		return  # the player already pressed Enter to retry
+	_message_label.text = ""
+
+	# The run's stats screen, with Retry / Main menu buttons.
+	var stats_screen := StatsScreen.new({
+		"game_over": true,
+		"title": "GAME OVER",
+		"subtitle": "%s  ·  fell on stage %d" % [Difficulty.NAMES[GameState.difficulty], GameState.stage],
+		"stats": GameState.run_stats,
+		"time": GameState.stat(GameState.run_stats, "time_ms") / 1000.0,
+		"stages_cleared": GameState.stat(GameState.run_stats, "stages_cleared"),
+		"score_line": str(GameState.score),
+		"achievements": GameState.run_achievements,
+		"extra": extra,
+	})
+	add_child(stats_screen)
+	if result["scrap"] > 0:
 		get_tree().create_timer(1.4).timeout.connect(Sfx.play.bind("scrap", 0.0, 0.0))
-	var where := "back to editor" if GameState.return_scene == GameState.EDITOR_SCENE else "menu"
-	_message_label.add_theme_font_size_override("font_size", 22)
-	_show_message("GAME OVER\n%s  ·  stage %d  ·  score %d%s\n\nEnter: retry   Esc: %s" % [
-		Difficulty.NAMES[GameState.difficulty], GameState.stage, GameState.score, extra, where])
+	var choice: String = await stats_screen.closed
+	if choice == "retry":
+		GameState.reset()
+		get_tree().reload_current_scene()
+	else:
+		get_tree().change_scene_to_file(GameState.return_scene)
 
 
 ## The game is over: everything stops where it is, like in the original.
@@ -575,6 +726,11 @@ func _register_kill(pos: Vector2, points: int) -> void:
 	combo += 1
 	combo_timer = COMBO_WINDOW
 	GameState.best_combo = maxi(GameState.best_combo, combo)
+	GameState.track_max("best_combo", combo)
+	if combo >= 5:
+		Achievements.unlock("chain_5")
+	if combo >= 12:
+		Achievements.unlock("chain_12")
 	var mult := mini(combo, MAX_MULTIPLIER)
 	var gained := points * mult
 	GameState.score += gained
@@ -628,6 +784,7 @@ func _on_powerup_collected(kind: PowerUp.Kind, by: Player) -> void:
 		return
 	GameState.score += 500
 	Sfx.play("powerup_pickup", 0.0, 0.0)
+	GameState.track("powerups", 1, by.index)
 	match kind:
 		PowerUp.Kind.STAR:
 			var text := ""
@@ -637,6 +794,8 @@ func _on_powerup_collected(kind: PowerUp.Kind, by: Player) -> void:
 				# The tank changes shape (see Player._current_sprite): make it noticeable.
 				var perk_text: String = ["", "FASTER SHELLS", "DOUBLE SHOT", "STEEL BREAKER"][by.stars()]
 				text = "STAR %d: %s\n+1 ARMOR" % [by.stars(), perk_text]
+				if by.stars() == 3:
+					Achievements.unlock("fully_loaded")
 			else:
 				# Already maxed out: a star repairs one lost armor plate instead.
 				by.hp = mini(by.hp + 1, by.max_hp)
@@ -651,6 +810,13 @@ func _on_powerup_collected(kind: PowerUp.Kind, by: Player) -> void:
 			_set_enemies_frozen(true)
 		PowerUp.Kind.BOMB:
 			shake = 10.0
+			var caught := 0
+			for t in get_tree().get_nodes_in_group("tanks"):
+				if t is Enemy and not (t as Enemy)._dead:
+					(t as Enemy).last_hit_by = by.index  # the bomb's kills are yours
+					caught += 1
+			if caught >= 4:
+				Achievements.unlock("bomb_squad")
 			_kill_all_enemies()  # (only damages a boss)
 		PowerUp.Kind.FORTIFY:
 			fortify_time = 15.0

@@ -17,7 +17,7 @@ const SOUND_NAMES := [
 	"stage_start", "stage_clear", "game_over",
 	"ui_move", "ui_pick", "pause", "cheat",
 	"combo", "boss_warning", "boss_hit", "deflect", "repair", "fuse", "snipe", "scrap",
-	"teleport",
+	"teleport", "achievement", "tally", "medal",
 ]
 
 const POOL_SIZE := 12

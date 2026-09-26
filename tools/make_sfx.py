@@ -213,6 +213,16 @@ def main():
     save("cheat", mix(melody([C5, E5, G5, C6, E6, G6, C7, G6, C7], 0.04, "square", 0.125),
                       melody([C4, 0, G4, 0, C5, 0, E5, 0, C6], 0.04, "triangle") * 0.6), 0.45)
 
+    # --- achievements and the stats screen
+    # Achievement unlocked: a bright little victory fanfare.
+    save("achievement", mix(melody([G5, C6, E6, 0, C6, G6, G6, G6], 0.07, "square", 0.25, 0.85),
+                            melody([C5, E5, G5, 0, E5, C6, C6, C6], 0.07, "triangle") * 0.6), 0.45)
+    # Tally tick: the short blip while the stats screen counts up kills.
+    save("tally", note(1900, 0.03, "square", 0.25, power=2.5), 0.28)
+    # Medal: a stage award pops onto the stats screen.
+    save("medal", mix(melody([E6, G6, C7], 0.05, "square", 0.125),
+                      osc(sweep(2000, 3200, 0.15), "triangle") * env(0.15, power=2) * 0.4), 0.38)
+
 
 if __name__ == "__main__":
     main()

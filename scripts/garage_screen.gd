@@ -171,6 +171,8 @@ func _on_tank_pressed(id: String) -> void:
 		GameState.unlocked_tanks.append(id)
 		GameState.selected_tank = id
 		GameState.save_progress()
+		if GameState.unlocked_tanks.size() >= 3:
+			Achievements.unlock("collector")
 		Sfx.play("powerup_pickup", 0.0, 0.0)
 	else:
 		Sfx.play("deflect", -4.0, 0.0)  # can't afford it

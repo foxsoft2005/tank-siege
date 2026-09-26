@@ -120,6 +120,8 @@ func try_teleport(tank: Tank) -> void:
 			tank.teleport_cooldown = 1.2  # so it doesn't bounce straight back
 			Fx.spark(self, dest)
 			Sfx.play("teleport", -2.0)
+			if tank is Player:
+				GameState.track("teleports", 1, (tank as Player).index)
 			return
 
 

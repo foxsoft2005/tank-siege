@@ -14,6 +14,7 @@ var _main_page: VBoxContainer
 var _levels_page: VBoxContainer
 var _options_page: VBoxContainer
 var _difficulty_page: VBoxContainer
+var _achievements_page: VBoxContainer
 var _coop_chosen := false
 var _coop_hint: Label
 var _best_label: Label
@@ -86,7 +87,8 @@ func _build_ui() -> void:
 	_levels_page = MenuKit.page("CUSTOM LEVELS", 240.0)  # filled in when opened
 	_options_page = MenuKit.options_page(func() -> void: _show_page(_main_page))
 	_difficulty_page = _build_difficulty_page()
-	for p in [_main_page, _levels_page, _options_page, _difficulty_page]:
+	_achievements_page = MenuKit.page("ACHIEVEMENTS", 330.0)  # filled in when opened
+	for p in [_main_page, _levels_page, _options_page, _difficulty_page, _achievements_page]:
 		_pages.add_child(p)
 	_panel = MenuKit.panel(_pages)
 	_ui.add_child(_panel)
@@ -132,6 +134,9 @@ func _build_main_page() -> VBoxContainer:
 		_show_page(_difficulty_page))
 	MenuKit.button(page, "Garage  (%d scrap)" % GameState.scrap, func() -> void:
 		get_tree().change_scene_to_file(GameState.GARAGE_SCENE))
+	MenuKit.button(page, "Achievements  (%d/%d)" % [Achievements.unlocked_count(), Achievements.LIST.size()], func() -> void:
+		_fill_achievements_page()
+		_show_page(_achievements_page))
 	MenuKit.button(page, "Custom levels", func() -> void:
 		_fill_levels_page()
 		_show_page(_levels_page))
@@ -200,10 +205,88 @@ func _fill_levels_page() -> void:
 	MenuKit.button(_levels_page, "Back", func() -> void: _show_page(_main_page))
 
 
+## One row per achievement: medal, name, description (or ??? for secrets you
+## haven't found), and progress for the counting ones ("37 / 100").
+func _fill_achievements_page() -> void:
+	for child in _achievements_page.get_children().slice(1):  # keep the title label
+		child.queue_free()
+	var got := Achievements.unlocked_count()
+	var summary := MenuKit.label(_achievements_page, "%d of %d unlocked" % [got, Achievements.LIST.size()], 11, Color("#c9ccd4"))
+	summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var bar := ProgressBar.new()
+	bar.max_value = Achievements.LIST.size()
+	bar.value = got
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(0, 6)
+	_achievements_page.add_child(bar)
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 136)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true  # arrow keys / D-pad scroll the list
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 2)
+	scroll.add_child(list)
+	_achievements_page.add_child(scroll)
+	# Unlocked first, then the rest in list order.
+	var order: Array[Dictionary] = []
+	for a in Achievements.LIST:
+		if Achievements.is_unlocked(a["id"]):
+			order.append(a)
+	for a in Achievements.LIST:
+		if not Achievements.is_unlocked(a["id"]):
+			order.append(a)
+	for a in order:
+		list.add_child(_achievement_row(a))
+	MenuKit.button(_achievements_page, "Back", func() -> void: _show_page(_main_page))
+
+
+func _achievement_row(a: Dictionary) -> Control:
+	var got := Achievements.is_unlocked(a["id"])
+	var hidden: bool = a.get("secret", false) and not got
+	# A flat Button, so it can take keyboard focus (and the list scrolls to it).
+	var row := Button.new()
+	row.focus_mode = Control.FOCUS_ALL
+	row.custom_minimum_size = Vector2(0, 38)
+	row.flat = true
+	var focus := StyleBoxFlat.new()  # a thin gold outline on the row you're on
+	focus.draw_center = false
+	focus.border_color = UITheme.ACCENT
+	focus.set_border_width_all(1)
+	focus.set_corner_radius_all(4)
+	row.add_theme_stylebox_override("focus", focus)
+	var box := HBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.offset_right = -14.0  # keep clear of the scrollbar
+	box.add_theme_constant_override("separation", 8)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(box)
+	box.add_child(MedalIcon.new(a["tier"], got, 10.0))
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", -2)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(col)
+	var title := MenuKit.label(col, "SECRET" if hidden else a["name"], 13,
+		Achievements.TIER_COLORS[a["tier"]] if got else Color("#9aa0b0"))
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var desc := MenuKit.label(col, "Keep playing to find this one." if hidden else a["desc"], 10,
+		Color("#c9ccd4") if got else Color("#6f7482"))
+	desc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var progress := Achievements.progress_text(a)
+	if progress != "":
+		var p := MenuKit.label(box, progress, 10, Color("#9fd8ff"))
+		p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return row
+
+
 func _show_page(page: VBoxContainer) -> void:
 	for p in _pages.get_children():
 		p.visible = p == page
-	_best_label.visible = page != _options_page  # the tall Options panel would cover it
+	_best_label.visible = page != _options_page and page != _achievements_page  # tall panels would cover it
 	if _coop_hint:
 		_coop_hint.visible = _coop_chosen
 	await MenuKit.center(_panel, 38.0)
@@ -212,6 +295,10 @@ func _show_page(page: VBoxContainer) -> void:
 	MenuKit.focus_first(page)
 	if page == _difficulty_page:  # start on the difficulty you played last
 		(page.get_node(Difficulty.NAMES[GameState.difficulty]) as Control).grab_focus()
+	if page == _achievements_page:  # start on the first row, so arrows scroll the list
+		for child in page.get_children():
+			if child is ScrollContainer and child.get_child(0).get_child_count() > 0:
+				(child.get_child(0).get_child(0) as Control).grab_focus()
 	if page == _levels_page and page.get_child_count() > 1:
 		var scroll := page.get_child(page.get_child_count() - 2)
 		if scroll is ScrollContainer and scroll.get_child(0).get_child_count() > 0:

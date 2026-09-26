@@ -118,6 +118,8 @@ func shoot() -> bool:
 
 ## Give our shells their upgrade powers.
 func _configure_bullet(b: Bullet) -> void:
+	b.player_index = index
+	GameState.track("shots", 1, index)
 	b.bounces_left = GameState.stacks("ricochet")
 	b.pierce_left = GameState.stacks("piercing") + int(_stat("pierce"))
 	b.blast = GameState.stacks("blast_shells") > 0 or bool(_stat("blast"))
@@ -130,6 +132,8 @@ func hit(from_dir := Vector2.ZERO, _damage := 1) -> void:
 	var before := hp
 	super(from_dir, 1)  # enemy shells always take exactly one hit point
 	# Armor Plating soaked the hit: blink for a moment so you can escape.
+	if hp < before:
+		GameState.track("armor_lost", before - hp, index)  # includes the fatal hit
 	if hp < before and hp > 0:
 		invulnerable_time = 1.0
 		Fx.debris(get_parent(), position, true)

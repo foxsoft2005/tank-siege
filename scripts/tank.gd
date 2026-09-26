@@ -22,6 +22,7 @@ var invulnerable_time := 0.0 # > 0 means shielded
 var frozen := false
 var body_size := Vector2(26, 26)  # collision box (the boss is much bigger)
 var teleport_cooldown := 0.0
+var last_hit_by := -1  # which player's shell hit us last (for the stats), -1 = nobody
 
 ## Floor tiles (see Level.floor_under)
 const MUD_SPEED := 0.5       # speed multiplier on mud
