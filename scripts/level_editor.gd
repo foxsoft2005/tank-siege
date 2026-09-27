@@ -298,6 +298,11 @@ func _build_sidebar() -> void:
 		map = _empty_map()
 		GameState.editor_map = map
 		queue_redraw())
+	MenuKit.button(actions, "Random", func() -> void:
+		_begin_stroke()  # (so Undo brings your map back)
+		map = LevelGen.generate(maxi(GameState.stage, 6), randi())  # stage 6+: every tile type
+		GameState.editor_map = map
+		queue_redraw()).tooltip_text = "Make a random map to start from"
 	MenuKit.button(actions, "Menu", _back_to_menu)
 	for b in actions.get_children():
 		(b as Control).custom_minimum_size = Vector2(40, 0)

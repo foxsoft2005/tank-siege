@@ -27,6 +27,7 @@ var player_level: int:
 var best_combo := 0  # longest kill chain this run
 var bosses_killed := 0
 var upgrades: Dictionary = {}  # upgrade id -> level, e.g. {"ricochet": 2}
+var run_seed := 0  # procedural levels: new random maps every run, fixed within a run
 
 # Cheats. god_mode and disco are toggles that survive a restart.
 var god_mode := false
@@ -200,6 +201,7 @@ func reset() -> void:
 	upgrades.clear()
 	cheats_used = god_mode or disco
 	_run_over = false
+	run_seed = randi()
 	run_stats = {}
 	stage_stats = {}
 	run_achievements.clear()
@@ -241,6 +243,16 @@ func track_max(key: String, value: int) -> void:
 ## Read a counter. `which` is stage_stats, run_stats or lifetime.
 static func stat(which: Dictionary, key: String, player := -1) -> int:
 	return which.get(key if player < 0 else "p%d.%s" % [player, key], 0)
+
+
+## The map for the current stage: a custom level, a procedural one (if that
+## option is on), or the handmade stage. Boss stages always use their arena.
+func current_map() -> PackedStringArray:
+	if is_custom():
+		return custom_map
+	if Settings.procedural_levels and not LevelData.is_boss_stage(stage):
+		return LevelGen.generate(stage, hash([run_seed, stage]))
+	return LevelData.get_map(stage)
 
 
 ## Level of an upgrade you own (0 = don't have it). See upgrades.gd.

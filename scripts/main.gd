@@ -96,7 +96,7 @@ func _ready() -> void:
 	_check_progress_achievements()
 	# A custom level from the editor, or the next campaign stage.
 	boss_stage = not GameState.is_custom() and LevelData.is_boss_stage(GameState.stage)
-	level.build(GameState.custom_map if GameState.is_custom() else LevelData.get_map(GameState.stage))
+	level.build(GameState.current_map())
 	if boss_stage:
 		enemies_quota = BOSS_STAGE_ESCORTS
 		boss_delay = 3.0

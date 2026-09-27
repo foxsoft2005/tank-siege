@@ -284,6 +284,27 @@ All the art is in `assets/sprites/`: 6 tank colors with 2 tread frames each, bri
 - **Or edit the text grids** in `tools/make_sprites.py`, where every character is one pixel. Then run `python tools/make_sprites.py` (needs Python 3 + Pillow). This regenerates *all* sprites, so don't run it after hand-editing PNGs.
 - `art.gd` loads textures and draws single frames from sprite sheets. Tanks draw their sprite rotated to face their direction and swap between the 2 frames as they move, so the treads roll. Tints change the look without new art: frozen tanks turn blue, damaged armor glows, and the hit flash uses white.
 
+## Procedural levels
+
+Turn on **Options → Procedural levels** and every stage becomes a new random map. Boss stages keep their arena. The option is **off by default**, which gives the handmade stages. It takes effect from the next stage, so you can switch it in the pause menu too.
+
+- **Fair repeats:** a stage keeps its map while you replay it in the same run (the map comes from a random run seed plus the stage number). A new run gives new maps.
+- **Stage-based tiles:** special tiles unlock the same way as in the handmade stages. Water arrives from stage 2, ice and mud from stage 3, barrels and belts from stage 4, and teleporters from stage 6. Steel gets more common as you go.
+- **Level editor:** the new **Random** button makes a map to start from. Undo brings yours back.
+
+**How the generator works** (`scripts/level_gen.gd`):
+1. It stamps random wall pieces (pillars, bars, blocks, L- and T-shapes, bush patches, lakes) onto the left half of the map.
+2. It mirrors that onto the right half. The original game's maps are symmetric too, and it makes random maps look designed.
+3. It checks the result is **valid**:
+   - the spawns and the base are clear;
+   - every enemy spawn can drive to your base and your spawn (steel, water and barrels block, bricks don't because they can be shot);
+   - there are no sealed-off pockets;
+   - there are enough walls and enough open space;
+   - belts never push into something solid;
+   - barrels are never next to a spawn or the base;
+   - teleporters come in pairs.
+4. If a map fails, it tries again with the next random numbers. In a test of 3,000 maps across stages 1–30, a valid map took 2 tries on average and under 1 ms, and none needed the fallback to a handmade map.
+
 ## Level editor
 
 **Title → Level editor.** Paint a map, test it, save it.
@@ -499,6 +520,7 @@ scripts/
   version.gd        the game's version number
   game_state.gd     autoload: data that survives scene changes, high score, input setup
   level_data.gd     the stage maps as text. Edit these to make your own levels!
+  level_gen.gd      procedural level generator (random, validated maps)
   level.gd          turns map text into walls; wall destruction; A* navigation grid
   wall.gd           one 16x16 piece of brick / steel / water
   bush.gd           bushes, drawn above tanks

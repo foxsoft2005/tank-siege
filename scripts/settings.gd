@@ -17,6 +17,7 @@ var fullscreen := false
 var window_scale := 2.0      # window size = game canvas (512x416) x this
 var pixel_perfect := false   # only scale by whole numbers (sharpest pixels)
 var check_updates := true
+var procedural_levels := false  # off = the handmade stages; on = LevelGen makes new ones
 
 
 func _ready() -> void:
@@ -89,6 +90,7 @@ func save_settings() -> void:
 	cfg.set_value("audio", "music", music_volume)
 	cfg.set_value("audio", "sfx", sfx_volume)
 	cfg.set_value("game", "screen_shake", screen_shake)
+	cfg.set_value("game", "procedural_levels", procedural_levels)
 	cfg.set_value("video", "fullscreen", fullscreen)
 	cfg.set_value("video", "window_scale", window_scale)
 	cfg.set_value("video", "pixel_perfect", pixel_perfect)
@@ -104,6 +106,7 @@ func load_settings() -> void:
 	music_volume = cfg.get_value("audio", "music", music_volume)
 	sfx_volume = cfg.get_value("audio", "sfx", sfx_volume)
 	screen_shake = cfg.get_value("game", "screen_shake", screen_shake)
+	procedural_levels = cfg.get_value("game", "procedural_levels", procedural_levels)
 	fullscreen = cfg.get_value("video", "fullscreen", fullscreen)
 	window_scale = cfg.get_value("video", "window_scale", window_scale)
 	pixel_perfect = cfg.get_value("video", "pixel_perfect", pixel_perfect)

@@ -88,6 +88,9 @@ static func options_page(on_back: Callable, on_about := Callable()) -> VBoxConta
 		Sfx.play("shoot", 0.0, 0.0))  # instant feedback while dragging
 	toggle(p, "Screen shake", Settings.screen_shake, func(on: bool) -> void:
 		Settings.screen_shake = on)
+	var proc := toggle(p, "Procedural levels", Settings.procedural_levels, func(on: bool) -> void:
+		Settings.procedural_levels = on)
+	proc.tooltip_text = "On: every stage is a new random map (boss stages stay the same).\nOff: the handmade stages. Takes effect from the next stage."
 	# Display: every window size that fits your screen, plus Fullscreen.
 	var scales := Settings.available_scales()
 	var labels: Array[String] = []
