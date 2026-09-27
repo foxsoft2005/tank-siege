@@ -121,6 +121,9 @@ jobs:
           # .../releases/latest/download/TankSiege-windows.zip
           (cd build/windows && zip -q ../TankSiege-windows.zip TankSiege.exe)
           mv build/macos/TankSiege.zip build/TankSiege-macos.zip
+          # The licenses travel with the game.
+          zip -q build/TankSiege-windows.zip LICENSE LICENSE-ASSETS.md
+          zip -q build/TankSiege-macos.zip LICENSE LICENSE-ASSETS.md
           # update.json for the in-game updater (see "Updates and auto-update" in the
           # README). The game reads it from .../releases/latest/download/update.json.
           # Without a patch URL, the title screen only offers "Open download page".

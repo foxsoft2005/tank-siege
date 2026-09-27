@@ -15,6 +15,7 @@ var _levels_page: VBoxContainer
 var _options_page: VBoxContainer
 var _difficulty_page: VBoxContainer
 var _achievements_page: VBoxContainer
+var _about_page: VBoxContainer
 var _coop_chosen := false
 var _coop_hint: Label
 var _best_label: Label
@@ -87,10 +88,12 @@ func _build_ui() -> void:
 	_pages = VBoxContainer.new()
 	_main_page = _build_main_page()
 	_levels_page = MenuKit.page("CUSTOM LEVELS", 240.0)  # filled in when opened
-	_options_page = MenuKit.options_page(func() -> void: _show_page(_main_page))
+	_options_page = MenuKit.options_page(func() -> void: _show_page(_main_page),
+		func() -> void: _show_page(_about_page))
+	_about_page = _build_about_page()
 	_difficulty_page = _build_difficulty_page()
 	_achievements_page = MenuKit.page("ACHIEVEMENTS", 330.0)  # filled in when opened
-	for p in [_main_page, _levels_page, _options_page, _difficulty_page, _achievements_page]:
+	for p in [_main_page, _levels_page, _options_page, _difficulty_page, _achievements_page, _about_page]:
 		_pages.add_child(p)
 	_panel = MenuKit.panel(_pages)
 	_ui.add_child(_panel)
@@ -158,6 +161,41 @@ func _build_main_page() -> VBoxContainer:
 		var b := MenuKit.button(grid, entry[0], entry[1])
 		b.custom_minimum_size = Vector2(146, 0)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return page
+
+
+## Who made it, the licenses, and the Godot Engine notice. (Godot's MIT
+## license asks every game made with it to include its license text.)
+func _build_about_page() -> VBoxContainer:
+	var page := MenuKit.page("ABOUT", 330.0)
+	page.add_theme_constant_override("separation", 4)
+	var lines := [
+		["Tank Siege v%s" % Updater.current_version, 14, UITheme.ACCENT],
+		["© 2026 foxsoft2005", 11, Color("#c9ccd4")],
+		["Code: MIT License", 11, Color("#c9ccd4")],
+		["Art, sound and music: CC BY-NC 4.0", 11, Color("#c9ccd4")],
+		["Made with the Godot Engine (godotengine.org)", 11, Color("#9fd8ff")],
+	]
+	for line: Array in lines:
+		var l := MenuKit.label(page, line[0], line[1], line[2])
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 118)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.focus_mode = Control.FOCUS_ALL  # arrow keys scroll the text
+	var text := Label.new()
+	# The license text has hard line breaks every ~80 characters; join them
+	# into paragraphs so the label can wrap it neatly.
+	var license := Engine.get_license_text().replace("\n\n", "\u00b6").replace("\n", " ").replace("\u00b6", "\n\n")
+	text.text = "GODOT ENGINE LICENSE\n\n" + license
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.custom_minimum_size = Vector2(300, 0)
+	text.add_theme_font_size_override("font_size", 9)
+	text.add_theme_color_override("font_color", Color("#9aa0b0"))
+	scroll.add_child(text)
+	page.add_child(scroll)
+	MenuKit.button(page, "Back", func() -> void: _show_page(_options_page))
 	return page
 
 

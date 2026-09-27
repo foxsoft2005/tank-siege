@@ -72,7 +72,8 @@ static func toggle(parent: Control, text: String, value: bool, on_change: Callab
 
 
 ## The Options page, shared by the title screen and the pause menu.
-static func options_page(on_back: Callable) -> VBoxContainer:
+## Pass `on_about` to add an "About & licenses" button (the title screen does).
+static func options_page(on_back: Callable, on_about := Callable()) -> VBoxContainer:
 	var p := page("OPTIONS", 260.0)
 	p.add_theme_constant_override("separation", 3)
 	slider(p, "Master volume", Settings.master_volume, func(v: float) -> void:
@@ -105,6 +106,8 @@ static func options_page(on_back: Callable) -> VBoxContainer:
 		Settings.apply())
 	toggle(p, "Check for updates", Settings.check_updates, func(on: bool) -> void:
 		Settings.check_updates = on)
+	if on_about.is_valid():
+		button(p, "About & licenses", on_about)
 	button(p, "Back", func() -> void:
 		Settings.save_settings()
 		on_back.call())

@@ -474,6 +474,8 @@ The letters are read by **key position** (QWERTY), so the codes also work with a
 
 ```
 project.godot       engine settings (window size, autoloads)
+LICENSE             MIT license for the code
+LICENSE-ASSETS.md   CC BY-NC 4.0 license for the art, sound and music
 export_presets.cfg  Windows + macOS export settings
 .github/workflows/build.yml   builds Windows + macOS on GitHub and publishes a Release
 .github/workflows/pages.yml   publishes site/ to GitHub Pages
@@ -555,6 +557,12 @@ scripts/
 - **Files.** `user://` is the game's own save folder. `ConfigFile` saves settings and the high score, `FileAccess` and `DirAccess` handle level files, and `HTTPRequest` downloads updates.
 
 This project builds everything in code so you can read it top to bottom. As you learn, try the Godot way: build a Tank **scene** in the editor (a `CharacterBody2D` with a `Sprite2D` and a `CollisionShape2D`), then `preload()` and `instantiate()` it. Also try a `TileMapLayer` for walls.
+
+## License
+
+- **Code** (`scripts/`, `scenes/`, the build scripts, the website code and the other files in `tools/`): **MIT License**, in `LICENSE`. Anyone can reuse it, even commercially, as long as they keep the copyright notice.
+- **Art, sound and music** (`assets/`, `site/img/`, and the scripts that generate them: `tools/make_sprites.py`, `make_sfx.py` and `make_music.py`): **CC BY-NC 4.0**, in `LICENSE-ASSETS.md`. Anyone can share and adapt them with credit, but not commercially.
+- **Godot Engine** is MIT-licensed, and its license text has to ship with the game. It's shown under **Options → About & licenses** on the title screen. Both license files are also inside the Windows and Mac downloads.
 
 ## Suggested next steps (roughly easy → harder)
 
