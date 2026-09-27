@@ -31,6 +31,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # all history and tags, to compare with the previous release
 
       - name: Check version numbers
         id: ver
@@ -47,6 +49,29 @@ jobs:
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # The in-game updater installs a release as a PATCH (.pck). A patch can't
+      # change project.godot (autoloads, window, input) or add/rename
+      # `class_name` scripts. If this release does either compared with the
+      # previous one, players get "Open download page" instead of a patch.
+      - name: Can this release be installed as a patch?
+        id: patch
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          PREV=$(git tag --list 'v*' --sort=-v:refname | grep -vx "v$V" | head -n 1 || true)
+          SAFE=false
+          if [ -z "$PREV" ]; then
+            echo "No earlier release: full download only."
+          elif [ "$(git show "$PREV:project.godot" | grep -v '^config/version=')" != "$(grep -v '^config/version=' project.godot)" ]; then
+            # (the version number itself changes every release, so it's ignored)
+            echo "project.godot changed since $PREV: full download only."
+          elif [ "$(git grep -h '^class_name' "$PREV" -- '*.gd' | sort)" != "$(git grep -h '^class_name' HEAD -- '*.gd' | sort)" ]; then
+            echo "class_name scripts changed since $PREV: full download only."
+          else
+            echo "Only scripts/assets changed since $PREV: players can update in-game."
+            SAFE=true
+          fi
+          echo "safe=$SAFE" >> "$GITHUB_OUTPUT"
 
       # Godot + export templates are ~1.4 GB to download, so keep them between runs.
       - name: Cache Godot
@@ -96,9 +121,15 @@ jobs:
           # .../releases/latest/download/TankSiege-windows.zip
           (cd build/windows && zip -q ../TankSiege-windows.zip TankSiege.exe)
           mv build/macos/TankSiege.zip build/TankSiege-macos.zip
-          # update.json for the auto-updater (see "Updates and auto-update" in the README)
-          python3 tools/make_update_manifest.py build/tank-siege.pck "$V" \
-            "$REPO_URL/releases/download/v$V/tank-siege.pck" "$REPO_URL/releases/tag/v$V" "Tank Siege v$V"
+          # update.json for the in-game updater (see "Updates and auto-update" in the
+          # README). The game reads it from .../releases/latest/download/update.json.
+          # Without a patch URL, the title screen only offers "Open download page".
+          PCK_URL=""
+          if [ "${{ steps.patch.outputs.safe }}" = "true" ]; then
+            PCK_URL="$REPO_URL/releases/download/v$V/tank-siege.pck"
+          fi
+          PAGE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          python3 tools/make_update_manifest.py build/tank-siege.pck "$V" "$PCK_URL" "$PAGE_URL" "Tank Siege v$V"
           mv update.json build/
           ls -la build
 

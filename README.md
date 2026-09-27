@@ -347,15 +347,17 @@ To get rid of the macOS warning, you need an Apple Developer account ($99/year).
 `site/` is a one-page website for the game: `index.html` plus the images in `site/img/`, with no build step. It uses the game's own palette, sprites and screenshots. Its two download buttons point to
 `https://github.com/foxsoft2005/tank-siege/releases/latest/download/TankSiege-windows.zip` (and `-macos.zip`), so after each new Release the page gets the newest version with no edits. The button for the visitor's own computer is marked automatically.
 
-**Hosting:** upload the `site/` folder anywhere that serves static files: GitHub Pages, Netlify, Cloudflare Pages, or itch.io as an HTML page. The download links only work for visitors when the release files are public. For that, make this repository public, or publish the zips somewhere public (a second public repo, or itch.io) and change the two `href`s in `index.html`.
+**Hosting on GitHub Pages:** `.github/workflows/pages.yml` publishes `site/` to **https://foxsoft2005.github.io/tank-siege/** whenever something in `site/` changes on `main`. You can also run it by hand from the Actions tab: **Deploy website** → **Run workflow**. One-time setup: in the repo, go to **Settings → Pages → Build and deployment → Source: GitHub Actions**. GitHub Pages and the download links need the repository to be **public**, unless you have a paid plan. You can also upload `site/` to any other static host, such as Netlify, Cloudflare Pages or itch.io.
 
 To change the screenshots, replace the PNGs in `site/img/`. The page shows them at 512×416, the game's own resolution.
 
 ## Updates and auto-update
 
-The game can check the internet for a newer version and install it. It's **off until you set it up**, because it needs somewhere to host your files. Two good options:
-- **GitHub:** host `update.json` in the repo and attach the `.pck` to a release.
-- **itch.io:** host the game there, and put `update.json` plus the `.pck` on any HTTPS host.
+The game checks for a newer version on the title screen and can install it. It's **set up for this repository**: `MANIFEST_URL` in `updater.gd` points to `https://github.com/foxsoft2005/tank-siege/releases/latest/download/update.json`, the `update.json` attached to the newest GitHub Release. The GitHub build script creates that file and the `.pck` patch for every release, so **publishing an update is just pushing a version tag** (see "Building the game"). The repository must be public, so players can download the files without a GitHub login.
+
+**Patch or full download?** A patch can't change `project.godot` (except the version number) or add or rename `class_name` scripts. The build script compares each release with the previous one:
+- **Nothing like that changed:** `update.json` offers **Download & install**, the in-game patch.
+- **Something did change:** it offers only **Open download page**, which opens the website so players get the full new version.
 
 **What the player sees:** the title screen shows "Update v1.1.0 available!" with **Download & install** and **Open download page**. There's a progress bar while it downloads, then "Restart now". After the restart, the new version is running.
 
@@ -367,7 +369,7 @@ The game can check the internet for a newer version and install it. It's **off u
 
 Safety details: only `https://` URLs are allowed. The patch is re-checked on every launch. A patch older than the installed game is deleted automatically. Deleting `user://updates/` rolls back.
 
-**Publishing an update, step by step:**
+**Publishing an update by hand** (only if you don't use the GitHub build script):
 1. Make your changes and bump `VERSION` in `scripts/version.gd`, for example `1.0.0` → `1.1.0`. Also update *Project Settings → Application → Config → Version*.
 2. Install the export templates (**Editor → Manage Export Templates**). The Windows and macOS presets are already in **Project → Export**. The GitHub build script also makes the `.pck` and `update.json` for you: see "Building the game".
 3. In the Export window, click **Export PCK/ZIP…** and save `tank-siege.pck`.
@@ -375,7 +377,7 @@ Safety details: only `https://` URLs are allowed. The patch is re-checked on eve
 5. Run `python tools/make_update_manifest.py tank-siege.pck 1.1.0 <pck URL> <your game page URL> "What's new"`. It writes `update.json`.
 6. Upload `update.json` to the address you put in `MANIFEST_URL`. Everyone running the game now gets the update.
 
-For the very first release, set `MANIFEST_URL` in `updater.gd` (for example `https://raw.githubusercontent.com/you/tank-siege/main/update.json`) and export the full game normally.
+Players need a version that already has `MANIFEST_URL` set, which is 1.5.1 or newer. Older versions can't find updates, so give those players the full download once.
 
 **Limits:** a patch can change any scene, script, art, sound or music. It can't change `project.godot` (window size, the autoload list, input settings) or add *new* `class_name` scripts. For changes like those, publish a full new download and set `page_url`, so players get the "Open download page" button.
 
@@ -474,6 +476,7 @@ The letters are read by **key position** (QWERTY), so the codes also work with a
 project.godot       engine settings (window size, autoloads)
 export_presets.cfg  Windows + macOS export settings
 .github/workflows/build.yml   builds Windows + macOS on GitHub and publishes a Release
+.github/workflows/pages.yml   publishes site/ to GitHub Pages
 site/               the game's website (index.html + img/)
 assets/sfx/         sound effects (.wav)
 assets/music/       chiptune music loops (.ogg)

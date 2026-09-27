@@ -33,8 +33,9 @@ signal status_changed
 enum State { IDLE, CHECKING, UP_TO_DATE, AVAILABLE, DOWNLOADING, READY, FAILED }
 
 ## Where your update manifest lives. Leave empty to turn updates off.
-## Example: "https://raw.githubusercontent.com/you/tank-siege/main/update.json"
-const MANIFEST_URL := ""
+## The GitHub build (.github/workflows/build.yml) attaches update.json to every
+## Release, and this link always points at the newest Release's copy.
+const MANIFEST_URL := "https://github.com/foxsoft2005/tank-siege/releases/latest/download/update.json"
 
 const PATCH_DIR := "user://updates/"
 const PATCH_FILE := PATCH_DIR + "patch.pck"
