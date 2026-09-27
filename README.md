@@ -302,7 +302,8 @@ Turn on **Options → Procedural levels** and every stage becomes a new random m
    - there are enough walls and enough open space;
    - belts never push into something solid;
    - barrels are never next to a spawn or the base;
-   - teleporters come in pairs.
+   - teleporters come in pairs;
+   - the base is protected from the top-middle enemy spawn, which is in the same column. There's always a small steel bunker between them, so an enemy can't destroy the base straight after spawning.
 4. If a map fails, it tries again with the next random numbers. In a test of 3,000 maps across stages 1–30, a valid map took 2 tries on average and under 1 ms, and none needed the fallback to a handmade map.
 
 ## Level editor

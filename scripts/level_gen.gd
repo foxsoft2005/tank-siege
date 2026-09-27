@@ -22,7 +22,11 @@ extends RefCounted
 ##     spawn (otherwise power-ups or tanks could end up somewhere pointless);
 ##   - enough walls to be interesting, enough open space to fight in;
 ##   - conveyor belts never push you into steel, water or a barrel;
-##   - barrels are not next to the spawns or the base.
+##   - barrels are not next to the spawns or the base;
+##   - the base can't be shot from the top-middle enemy spawn: that spawn is
+##     in the base's column, so there must be STEEL somewhere in that column
+##     between them (shells fly over water, and bricks break). _build() puts
+##     a small bunker there; the check makes sure nothing removed it.
 ##
 ## The same seed always gives the same map, so a stage keeps its layout when
 ## you retry it (Main passes GameState.run_seed + the stage number).
@@ -30,7 +34,8 @@ extends RefCounted
 const SIZE := 13
 const HALF := 7  # columns 0..6; column 6 is the middle and mirrors onto itself
 const MAX_TRIES := 80
-const SOLID := "SWX"  # tanks can't drive through (or shoot through) these
+const SOLID := "SWX"  # tanks can't drive through these
+const BASE_COLUMN := 6  # the base and the top-middle enemy spawn share this column
 
 
 ## A valid map for `stage`, always the same for the same seed.
@@ -88,6 +93,7 @@ static func _build(rng: RandomNumberGenerator, stage: int) -> PackedStringArray:
 		_put_if_empty(g, 3, 12, "B")
 
 	_mirror(g)
+	_bunker(g, rng)
 	for p in LevelData.PROTECTED:
 		g[p.y][p.x] = "."
 	var out := PackedStringArray()
@@ -139,6 +145,18 @@ static func _belt(g: Array, rng: RandomNumberGenerator) -> void:
 	var ch := ">" if rng.randf() < 0.5 else "<"
 	for i in rng.randi_range(2, 3):
 		_put_if_empty(g, x + i, y, ch)
+
+
+## Guard the base from the top-middle spawn, which is in the same column:
+## a steel block in the middle column (rows 7-9) with bricks either side, like
+## the handmade stages. Row 10 stays open, so raiders can still reach the spot
+## above the base: they just have to drive around, not shoot from the spawn.
+static func _bunker(g: Array, rng: RandomNumberGenerator) -> void:
+	var y := rng.randi_range(7, 9)
+	g[y][BASE_COLUMN] = "S"
+	for x in [BASE_COLUMN - 1, BASE_COLUMN + 1]:
+		if g[y][x] in [".", "G", "I", "M"]:
+			g[y][x] = "B"
 
 
 static func _put_if_empty(g: Array, x: int, y: int, ch: String) -> void:
@@ -208,6 +226,14 @@ static func _is_valid(map: PackedStringArray) -> bool:
 			for p in LevelData.PROTECTED:
 				if absi(p.x - x) <= 1 and absi(p.y - y) <= 1:
 					return false
+
+	# Steel between the top-middle spawn and the base (see _bunker).
+	var shielded := false
+	for y in range(1, 11):
+		if map[y][BASE_COLUMN] == "S":
+			shielded = true
+	if not shielded:
+		return false
 
 	# Teleporters only work in pairs.
 	var teleporters := 0
