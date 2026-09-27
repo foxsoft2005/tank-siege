@@ -14,3 +14,6 @@ __pycache__/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Godot import files for the website (site/ has a .gdignore, but just in case)
+site/**/*.import
